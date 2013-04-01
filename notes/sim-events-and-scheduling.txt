@@ -1,0 +1,207 @@
+manage simulation rate better:
+  * one "action" by the player character should:
+    - take inspiration from turn-based RPGs
+    - queue the action?
+    - the action consume character time before it happens?
+    - the action consumes character time for a while after?
+    - consumes character time on either side of the action happening?
+    - the action begins and ends at different times:
+      * queue the action
+      * when the action is processed,
+        - action essentially happens immediately, but
+        - state of character is set to "walking" or "busy" or the like
+        - character becomes available/idle in the future,
+            and can process another action from the queue
+  * user controlled rates:
+    - no limit (max speed)
+    - single step 1 cycle/event (period, comma, or semicolon hotkey?)
+    - limit cycles/events-per-realtime / sim-time-per-realtime
+  * use a virtual time-delta somehow?
+    - enable simulation to skip time until something interesting needs computing
+    - need to know how much time can be skipped
+      * objects report "how much time can be skipped"?
+        - how the heck can they know?
+      * objects are simply notified of events, like with a GUI
+        - and so they can request to be notified by a clock
+          * at a given time or frequency, or on each cycle
+        - use QObjects (or even QAbstractItemModels) and QEvents?
+          * probably shouldn't mingle application events with simulation events?
+          * may have more overhead than needed?
+          * different distribution model from GUI events:
+            - sim events are often broadcast (and ignored)
+            - responding to a sim event probably doesn't consume it
+            - return value from processing a sim event should probably be a "Result" or None
+
+      - simulation objects only know time passes by receiving events:
+          * events that include the time, including timer generated time events
+          * multiple events may be received with the same sim-time-stamp
+            - they are implcitly sequential, though do not "take time"
+      - a timer is essentially an absolute sim-time at which to send a time event.
+          a recurring timer reschedules itself after each timeout
+      - other timer-like things could include:
+          about-to-repaint
+      - how to delete timers, particularly recurring timers ?
+
+How Events Work in Qt (and essentially all windowing systems)
+  Qt class heirarchy:
+    QObject
+      QEvent
+      QWidget
+      QCoreApplication
+        QApplication
+  Event processing chain:
+    # Most or all of these steps are actually using derived classes.
+    QApplication.exec()  # main loop runs for duration of program
+      e = QEvent.QEvent()
+      QCoreApplication.postEvent(e) or QCoreApplication.sendEvent(e)
+        QCoreApplication.notify(receiver_qobject, e)
+          foreach filter installed_on QCoreApplication.instance():
+            filter.eventFilter(receiver_qobject, e)
+          foreach filter installed_on QObject:
+            filter.eventFilter(receiver_qobject, e)
+          QObject.event(e) # returns True to indicate message was accepted/consumed
+                           # QWidget.event() converts tab keystrokes to focus changing events
+            QObject.specializedEvent(e) # returns void (bottom of chain)
+              QObject.doStuffBecauseOfEvent()
+  Where do events come from?
+    hardware devices, via the OS, at root:
+      keyboard
+      mouse
+      clock (periodic or one-shot QTimers)
+      network
+    Often, processing an event generates another event, reflecting a higher level of interpretation:
+      key up/down event pair -> character event
+      tab key event pair -> focus (receiver of future keyboard events) change event
+      mouse position events -> choose which sub-window to pass mouse events on to
+      mouse button down event -> set mouse capture
+      mouse button up event -> release mouse capture
+      mouse button down event -> QAbstractButton.clicked() signal/event
+      QAbstractSlider-widget button-clicked signal/event -> QAbstractSlider.valueChanged() signal/event
+  How are they propagated?
+    downward from parent to child widgets/objects
+      until "accepted" or ignored with no further receivers
+    most events have a single receiver/destination
+      some are processed by multiple widgets/objects on the way down
+  Who gets events?
+    Any object/class that overrides one of the event processing functions
+      typically the specialized event function, an event filter, or obj.event() or app.notify()
+    Any object that requests timer events
+      startTimer() method:
+        QObject.startTimer(interval) returns a timer ID
+        QObject.timerEvent(e) is called with periodic or idle QTimerEvents
+      QTimer() method:
+        t = QTimer()
+        connect(t, SIGNAL(timeout()), SLOT(whatever))
+        t.start(interval)
+        whatever() is called with periodic or idle or one-shot QTimerEvents
+
+How should simulation events work?
+  remember: event-driven is firstly more efficient than polling
+  possible propagation methods:
+    global broadcast
+      every object in the simulation receives this event
+        very computationally intensive
+      probably not a good idea
+    local broadcast
+      possibly very computationally intensive
+        still a lot of messages?
+        how to decide who is local to who?
+      analagous to physics of locality
+        any object may choose to interact with any other nearby object
+    by request to interested objects (such as time events)
+      direct notification creates problem of wanting to intercept events
+  filtering is very desirable
+    examples:
+      opaque objects actively block optical events
+      soundproof objects actively block acoustic events
+      airtight & watertight objects actively block chemical-propagation events
+      space/time dilation containers & effects intercept/skew timer and other events/queries
+  some typical events:
+    timeout(timestamp)
+    moving (object, from, to)
+      presence_changed(object, isHere)
+    pressure_changed(air, location, old_pressure, new_pressure)
+    temperature_changed(old_temp, new_temp)
+    warning_indicator(machine)
+      vibration(source, amplitude)
+        sound(source, amplitude)
+          speech(utterance)
+            greeting(from, to)
+    odor(type, amplitude)
+    disintegrator_beam(from, to)
+    job_posted(job)
+      build_order_posted(location, build_type)
+    machine_activation(machine, isActive)
+    sensor_probing(probe_type)
+    topology_changed(where)
+  perhaps distinguish two broad classes of events:
+    state change of relatively static objects
+      these can generally be queried at any time
+    dynamic/transient/ephemeral simulation flow:
+      gas, liquid, pressure, sound, temperature, molecules, odor, radiation
+      can't as well query "what is the sound?"
+  events are closely related to simulation logic
+    "can/may this happen" is similar to "this is happening" is similar to "if condition: happen"
+  events, and perhaps all calls, should be passed through all intermediary containers
+    obj.Event(receiver, event) -> contained_objects.Event(receiver, event)
+      each can then choose to withhold or modify the event
+    ...sigh...but which ones?  broadcast through _all_ of them?  Please, no!
+    directly ask receiver for list of parents, and send using:
+      obj.Event([receivers], event) -> contained_objects.Event([receivers], event)
+  timers (event based)
+    anything of duration should request a timer to notify it when the duration is up
+      self.CallUp('SetTimer', 'NextState', delta=60)
+    absolute vs. relative time
+      storing times as relative values requires updating them whenever the current time changes
+        "20 minutes into the future" will never seem to arrive
+          unless each clock tick decreases the stored value
+      absolute time may cause numeric overflow
+        2**32 seconds = 136 simulated years
+        2**32 milliseconds = 50 simulated days
+        2**64 milliseconds = .5 billion simulated years
+        2**68.5 milliseconds = current age of universe
+        Ok, Python longs can be at least as large as 2**(2**32)
+    container maintains priority queue of timers
+      can itself request timer from its parent, for the earliest timer in its queue
+    container can skew time how?
+      maintain a skew factor
+      upon any timer or skew-factor-changing event,
+        compute next skew-timer
+          parent_time = child_time * skew_factor
+        adjust parent's "first timer in child queue" timer to match
+
+2013-Mar-28
+
+Scheduler should manage processes and their events/inputs, clocks (and outputs?)
+
+Any SimObject.Method could be a "process" (a function called with events/input)
+
+Processes are added and removed from Scheduler
+
+While on scheduler, they can receive events/input, request timer events
+
+Inputs/events:
+  timer expiration
+  user input
+    command walk
+    command go
+  notice of new jobs posted ?
+  effects from environment
+    changes in environment
+    arriving & departing objects
+    stuff being done _to_ them
+
+Processes have:
+  callback method
+  event/input queue
+  goal queue/set + planner (goal solving stack or graph)
+
+Player (& other agents) need to take (virtual) time to do stuff.  Need to be able to execute the simulation just long enough for Player to walk a step.  How?
+  - just run the sim an assumed amount of time
+  - Player tracks/estimates how long until it's done executing; run the sim that long
+  - execute simulation until player input queue is empty
+      if queue had one simple item that could be done immediately, it gets done
+      if other goals were already being persued or input request was complicated,
+        only some gets done, rest is stored in goal queue/set
+      player is unlikely to have input waiting at every possible time slice
+        if so, just wait until all user-issued inputs have been consumed

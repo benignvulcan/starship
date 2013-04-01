@@ -1,0 +1,60 @@
+
+Names for Mathematical, Cardinal (Compass) and Relative Directions in Space (CARDIS!)
+
+Mathematical
+  x
+  y
+  z
+  t (time)
+  4th spatial axis: w or u
+    ana ("up toward") +W
+    kata ("down from") -W
+
+Cardinal
+  north, n
+  east, e
+  south, s
+  west, w
+  up, u
+  down, d
+Ordinal, Intercardinal, Intermediate
+  northeast, ne
+  southeast, se
+  southwest, sw
+  northwest, nw
+
+Relative, Egocentric
+  left, l, port, sinister
+  right, r, starboard, dexter
+  forward, f, fwd, fore, bow
+  backward, b, back, aft
+  up, u
+  down, d
+  dorsal
+  ventral (palmar)
+  distal
+  proximal
+  clockwise, cw, +theta
+  counter-clockwise, ccw
+  to and fro
+  future, past
+
+Body Planes
+  sagittal   plane divides body into: sinister and dexter (left and right), X axis
+  coronal    plane divides body into: ventral and dorsal, Z axis
+  transverse plane divides body into: cranial and caudal, anterior and posterior, Y axis
+
+Physics
+  Minkowski spacetime (3 space dimensions + 1 time dimension)
+
+Other (Abritrary) Naming Schemes
+  Quark Flavors
+    up, charm, top, photon, higgs boson
+    down, strange, bottom, gluon
+    electron neutrino, muon nutrino, tau nutrino, Z boson
+    electron, muon, tau, W boson
+
+Volume of hypersphere: V = 2*pi^2*r^3
+
+look at Greek & Latin names
+

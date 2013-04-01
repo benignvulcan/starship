@@ -1,0 +1,11 @@
+*** WARNING FOR USERS OF QtDesigner **
+
+QtDesigner 4.6.2 (under Ubuntu 10.04)
+  will sometimes produce a file that
+pyuic4 4.7.2 (for Qt version 4.6.2) (under Ubuntu 10.04)
+  cannot compile.
+This seems to only happen when I edit certain items in the Property Editor, and can be fixed by resetting those items back to their default (and setting those properties in the code instead).
+When editing properties that have not prevously been edited (as indicated by boldface property names), I recommend frequent saves and test builds, such that you can easily find and avoid problematic property settings.
+
+Also see dockcontentswidget.py for an unrelated issue with QDockWidget.
+

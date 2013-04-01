@@ -1,0 +1,1 @@
+make && (./starship.py "$@"; echo exit code $?)

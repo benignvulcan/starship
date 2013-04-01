@@ -1,0 +1,42 @@
+Dwarf Fortress notes (fortress mode)
+  user does not directly control dwarves!
+  various methods of management, with very poorly factored UI:
+    map-based inspectors:
+      k general tile contents
+      v unit-specific details
+          including labor restrictions
+      t contents of buildings
+    map-based controls:
+      d designate areas: mining, gathering, en mass item properties, traffic
+      p define stockpiles: a single rectangular area - stockpiles pull items in
+      i define zones: a single rectangular area
+      b build discrete sized stationary things: furniture, doors, windows, building, traps, leveers
+      q stationary item config: workshop tasks, building prefs & deconstruction, stockpile settings
+      n waypoints, unit routes, & notes
+      w specify burrows: arbitrary areas
+    status screens
+      a announcements
+      r reports
+      z status: general status & inventories
+          ALSO CONTROLS slaughtering, stone use
+      u units list
+      R rooms & buildings list
+      l legendary artifacts
+      c civilizations
+    other control screens:
+      j jobs: production queue
+      n nobles: administrative memberships
+      m military: squad memberships, uniforms, supplies
+      s squad orders
+      o standing orders: general fortress-wide behavior
+      h hotkeys
+  In summary:
+    some stuff is fixed size, some adjustably sized, others are arbitrary zones.
+      some things look adjustably sized but are really just abitrary zones
+    each is viewable and controlable.
+
+Dwarf Fortress has an unintuitive wall/floor/ceiling model:
+  walls occupy entire cells, while each cell has an (undisplayed) upper "wall" part and lower "floor" part
+  ceilings are the floors of the cells of the next layer up
+  doorways occupy entire cells
+

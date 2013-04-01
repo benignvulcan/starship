@@ -1,0 +1,27 @@
+Notes about the Reality Being Modeled
+
+Human sizes:
+  avg human
+    1.5 to 1.8 meters tall, few (less than 1% ?) above 2 meters
+    50 to 150 kg, 70 averge
+      .07 m^3 average volume
+    average walking clearance seems to be about .5 meters wide
+    humans most closely match a voxel volume of proportions 1x1x4
+      fitting best into a volume of proportions 1x1x3
+  corridors
+    2 meters high feels short, though it looks like about 99% of actual humans would fit
+      2.5 meters = 8.2 feet, similar to typical house ceiling height
+    would need to be at least about 1 meter wide to permit simple/quick passing
+  wheelchairs - typical turning-in-place requires just over 1.5 meter diameter
+  by extrapolation, people, robots, machines, often need about 7 times their volume to articulate within?
+
+Human Speeds
+   1.4 m/s   walking, typical
+   2.5 m/s   walking, maximum
+   4.5 m/s   running, 1 mile, "average" person
+   5.9 m/s   1 hour marathon record
+   6.2 m/s   sprinting 100 m, "average" person
+  10.4 m/s   sprinting, Olympic record
+
+  Walking speeds correlate with "value of time", see https://en.wikipedia.org/wiki/Preferred_walking_speed
+
