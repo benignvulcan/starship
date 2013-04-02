@@ -9,7 +9,7 @@ import math, random, heapq, unittest
 from vexor import *
 import scheduler
 
-DEBUG = True
+DEBUG = False
 
 def sign(n): return cmp(n,0)
 
@@ -336,6 +336,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
       there = frozenset([there])
     if not there: return None
     if here in there: return []   # can't get any closer!
+    if DEBUG: print "Path From {} to {}".format(here, there) 
     if randomize:
       # randomly prioritize equidistant choices
       rrng = 2**30
@@ -361,6 +362,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
         while current in came_from:
           current = came_from[current]
           path.append(current)
+        if DEBUG: print "found shortest path from {} to {}".format(here, there)
         return path
       heapq.heappop(tovisit)
       visited.add(current)
@@ -380,6 +382,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
            # visit this node again in the future
            # (even if already visited, because now we know a shorter route)
            heapq.heappush(tovisit, (fscore[pn], random.randrange(rrng), pn) )
+    if DEBUG: print "no path from {} to {}".format(here, there)
     return None
 
 class EnumerateConstants(object):
@@ -440,7 +443,6 @@ class Cell(SimObject):
   def Pos(self): return self._pos
   def ExistingNeighbors(self):
     return self.TileMap().ExistingNeighbors(self._pos)
-  def __repr__(self): return "Cell@"+repr(self._pos)
   def Add(self, obj):
     if not obj in self._objects:
       self._objects.add(obj)
@@ -464,6 +466,10 @@ class Cell(SimObject):
     self._parent.Changed(self)
   def isTraversable(self):
     return len(self._components.obstructions)==0 and not self._components.support is None
+  def isAccessible(self):
+    for n in self.ExistingNeighbors():
+      if n.isTraversable(): return True
+    return False
   def GetBgTexture(self):
     if self._components.structure is None and self._components.support is None:
       return Textures.VOID
@@ -755,9 +761,12 @@ class JobDispatcher(object):
     candidates = [w for w in self._idleWorkers if w.isIdle()]
     if not candidates:
       return
-    for j in self._jobs:
-      if len(j.claimants)>0:
-        continue
+
+    possibleJobs = filter(lambda j: j.target.isAccessible() and not j.claimants, self._jobs)
+    if DEBUG: print "Possible Jobs:", possibleJobs
+    for j in possibleJobs:
+      #if len(j.claimants)>0:
+      #  continue
       h = []
       #candidates.sort(key=lambda w: w.Parent().Pos().manhattanDistance(j.target.Pos()))
       #nearest = min(candidates, key=lambda w: w.Parent().Pos().manhattanDistance(j.target.Pos()))
