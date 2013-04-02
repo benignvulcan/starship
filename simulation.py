@@ -511,12 +511,14 @@ class NPC(Character):
     self._job = None
     self._path = []
   def Cycle(self, _unusedInput):
-    if self._job is None and random.choice([True,False]):
-      self.LookForJob()
+    #if self._job is None and random.choice([True,False]):
+    #  self.LookForJob()
     if self._job:
       self.JobWalk()
     else:
       self.DrunkWalk()
+  def isIdle(self):
+    return self._job is None
   def LookForJob(self):
     if not self._job is None:
       return
@@ -530,20 +532,26 @@ class NPC(Character):
       p = self.PathTo(j.target.Pos())
       if p:
         self._path = p
-        self.TakeJob(j)
-        j.Start(self)
+        self.TakeJob(j, p)
         break
     if jobs and not self._job: print "no pathable jobs"
-  def TakeJob(self, j):
+  def TakeJob(self, j, initialPath=None):
     if not self._job is None:
       self.AbandonJob()
     self._job = j
+    self._path = initialPath
     self.Simulation().ClaimJob(self, j)
+    j.Start(self)
     self.Changed()
   def AbandonJob(self):
     self._path = None
     self.Simulation().UnclaimJob(self, self._job)
     self._job = None
+    self.Changed()
+  def FinishJob(self):
+    self._job.Finish(self)
+    self.Simulation().FinishJob(self._job)
+    self._job = None  # done
     self.Changed()
   def JobWalk(self):
     if self._path is None:
@@ -567,10 +575,7 @@ class NPC(Character):
         print "  giving up occupied job"
         self.AbandonJob()
       return
-    self._job.Finish(self)
-    self.Simulation().FinishJob(self._job)
-    self._job = None  # done
-    self.Changed()
+    self.FinishJob()
   def DrunkWalk(self):
     #print "NPC.DrunkWalk()"
     c = self._parent
@@ -703,6 +708,75 @@ class Player(Character):
     self.Simulation().CenterOn(self._parent)
   def GetColor(self): return (50,255,191)
 
+class JobDispatcher(object):
+
+  def __init__(self, aSimulation):
+    super(JobDispatcher,self).__init__()
+    self._simulation = aSimulation
+    self._jobs = []
+    self._workers = set()
+    self._idleWorkers = set()
+    self._process = self._simulation.Scheduler().CreateProcess(self.AssignJobs)
+    self._simulation.Scheduler().PostEvent(self._process, dt=1, recurring=True)
+  def AddWorker(self, anNPC):
+    self._workers.add(anNPC)
+    self._idleWorkers.add(anNPC)
+  def PostJobs(self, jobs):
+    for j in jobs:
+      self.PostJob(j)
+  def PostJob(self, j):
+    assert j.claimants == []
+    if any(j.isSimilar(b) for b in self._jobs):
+      print "discarding duplicate job posting"
+      return
+    self._jobs.append(j)
+    # Assuming target is a cell...
+    j.target._futureLook.append(j)
+    j.target.Changed()
+  def ClaimJob(self, claimant, j):
+    print "ClaimJob", j
+    assert j in self._jobs
+    j.claimants.append(claimant)
+  def UnclaimJob(self, claimant, j):
+    print "UnclaimJob", j
+    assert j in self._jobs
+    j.claimants.remove(claimant)
+  def GetUnclaimedJobs(self):
+    return [j for j in self._jobs if len(j.claimants)==0]
+  def FinishJob(self, j):
+    print "FinishJob", j
+    if j in self._jobs:
+      self._jobs.remove(j)
+    else:
+      print "  job %s not found" % j
+  def JobCount(self):
+    return len(self._jobs)
+  def AssignJobs(self, _):
+    candidates = [w for w in self._idleWorkers if w.isIdle()]
+    if not candidates:
+      return
+    for j in self._jobs:
+      if len(j.claimants)>0:
+        continue
+      h = []
+      #candidates.sort(key=lambda w: w.Parent().Pos().manhattanDistance(j.target.Pos()))
+      #nearest = min(candidates, key=lambda w: w.Parent().Pos().manhattanDistance(j.target.Pos()))
+      for w in candidates:
+        dist = w.Parent().Pos().manhattanDistance(j.target.Pos())
+        if dist < 100:
+          heapq.heappush(h, (dist, w))
+      while h:
+        nearest = h[0][1]
+        p = nearest.PathTo(j.target.Pos())
+        if p:
+          nearest.TakeJob(j, p)
+          candidates.remove(nearest)
+          if not candidates:
+            return
+          break
+        else:
+          heapq.heappop(h)
+
 class Simulation(SimObject):
 
   def __init__(self, qparent):
@@ -712,7 +786,7 @@ class Simulation(SimObject):
     self._changedCells = set()
     self._centerOn = None
     self._scheduler = scheduler.Scheduler()
-    self._jobs = []
+    self._dispatcher = JobDispatcher(self)
 
     self.CreateWorld()
     count = len(self._cells)
@@ -731,37 +805,28 @@ class Simulation(SimObject):
       startCell = self._cells[random.choice(startVexors)]
       npc = NPC(parent=startCell)
       startCell.Add(npc)
+      self._dispatcher.AddWorker(npc)
 
     self._cells._trackRegions = True
     self._cells.ComputeRegions()
 
+  def Now(self):
+    return self._scheduler.Now()
+
   def PostJob(self, j):
-    j.timestamp = self._scheduler.Now()
-    assert j.claimants == []
-    if any(j.isSimilar(b) for b in self._jobs):
-      print "discarding duplicate job posting"
-      return
-    self._jobs.append(j)
-    # Assuming target is a cell...
-    j.target._futureLook.append(j)
-    j.target.Changed()
+    self._dispatcher.PostJob(j)
+  def PostJobs(self, jobs):
+    self._dispatcher.PostJobs(jobs)
   def ClaimJob(self, claimant, j):
-    print "ClaimJob", j
-    assert j in self._jobs
-    j.claimants.append(claimant)
+    self._dispatcher.ClaimJob(claimant, j)
   def UnclaimJob(self, claimant, j):
-    print "UnclaimJob", j
-    assert j in self._jobs
-    j.claimants.remove(claimant)
+    self._dispatcher.UnclaimJob(claimant, j)
   def GetUnclaimedJobs(self):
-    now = self._scheduler.Now()
-    return [j for j in self._jobs if len(j.claimants)==0]
+    return self._dispatcher.GetUnclaimedJobs()
   def FinishJob(self, j):
-    print "FinishJob", j
-    if j in self._jobs:
-      self._jobs.remove(j)
-    else:
-      print "  job %s not found" % j
+    self._dispatcher.FinishJob(j)
+  def JobCount(self):
+    return self._dispatcher.JobCount()
 
   def CreateWorld(self):
     HUB_RADIUS = 3**2

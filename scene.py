@@ -68,6 +68,7 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
         #painter.drawRect(-1,-1,1,1)
         #painter.drawConvexPolygon(self.polygon())
     if False:
+      # paint region number
       painter.setBrush(self.brush())
       painter.setPen(QtCore.Qt.yellow)
       #painter.setFont(QtGui.QFont("Helvetica", 8))

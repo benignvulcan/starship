@@ -103,7 +103,8 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     print "actionBuildDeck"
     for gtile in self._scene.selectedItems():
       if not simulation.DECK in gtile._cell._objects:
-        self._simModel.PostJob( simulation.Construct(gtile._cell, simulation.DECK) )
+        j = simulation.Construct(gtile._cell, simulation.DECK, timestamp=self._simModel.Now())
+        self._simModel.PostJob(j)
       else: print "%s already contains deck" % (gtile._cell.Pos(),)
     self.frameUpdate()
 
@@ -138,8 +139,6 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
       if len(selectedTiles):
         self._simModel.Player().PostInput(simulation.GoTo([t._cell.Pos() for t in selectedTiles]))
         self.ExecSimCmd()
-    elif k == QtCore.Qt.Key_D:
-      print self._simModel._jobs
     else:
       print "StarshipMainWindow.keyPressEvent(%08x)" % k
       StarshipMainWindow_base.keyPressEvent(self, event)
@@ -207,7 +206,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
         ( self._simModel.Scheduler().Now()
         , (self.cyclecount-self.perfCycleStamp)/dt
         , (self.framecount-self.perfFrameStamp)/dt
-        , len(self._simModel._jobs)
+        , self._simModel.JobCount()
         )
       )
     self.perfClockStamp = now
