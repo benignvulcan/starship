@@ -758,34 +758,24 @@ class JobDispatcher(object):
   def JobCount(self):
     return len(self._jobs)
   def AssignJobs(self, _):
-    candidates = [w for w in self._idleWorkers if w.isIdle()]
+    "Match available jobs to available workers"
+    candidates = filter(lambda w: w.isIdle(), self._idleWorkers)
     if not candidates:
       return
 
-    possibleJobs = filter(lambda j: j.target.isAccessible() and not j.claimants, self._jobs)
+    possibleJobs = filter(lambda j: not j.claimants and j.target.isAccessible(), self._jobs)
     if DEBUG: print "Possible Jobs:", possibleJobs
     for j in possibleJobs:
-      #if len(j.claimants)>0:
-      #  continue
-      h = []
-      #candidates.sort(key=lambda w: w.Parent().Pos().manhattanDistance(j.target.Pos()))
-      #nearest = min(candidates, key=lambda w: w.Parent().Pos().manhattanDistance(j.target.Pos()))
-      for w in candidates:
-        dist = w.Parent().Pos().manhattanDistance(j.target.Pos())
-        if dist < 100:
-          heapq.heappush(h, (dist, w))
-      while h:
-        nearest = h[0][1]
-        p = nearest.PathTo(j.target.Pos())
-        if p:
-          nearest.TakeJob(j, p)
-          candidates.remove(nearest)
-          if not candidates:
-            return
-          break
-        else:
-          heapq.heappop(h)
-
+      adjacentRegions = [n._region for n in j.target.ExistingNeighbors()]
+      candidatesInRegion = filter(lambda w: w.Parent()._region in adjacentRegions, candidates)
+      if not candidatesInRegion: continue
+      nearest = min(candidatesInRegion, key=lambda w:w.Parent().Pos().manhattanDistance(j.target.Pos()));
+      p = nearest.PathTo(j.target.Pos())
+      nearest.TakeJob(j, p)
+      candidates.remove(nearest)
+      if not candidates:
+        return
+      
 class Simulation(SimObject):
 
   def __init__(self, qparent):
