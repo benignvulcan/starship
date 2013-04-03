@@ -9,7 +9,7 @@ import math, random, heapq, unittest
 from vexor import *
 import scheduler
 
-DEBUG = False
+DEBUG = True
 
 def sign(n): return cmp(n,0)
 
@@ -336,7 +336,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
       there = frozenset([there])
     if not there: return None
     if here in there: return []   # can't get any closer!
-    if DEBUG: print "Path From {} to {}".format(here, there) 
+    if DEBUG: print "Path From {0} to {1}".format(here, there) 
     if randomize:
       # randomly prioritize equidistant choices
       rrng = 2**30
@@ -362,7 +362,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
         while current in came_from:
           current = came_from[current]
           path.append(current)
-        if DEBUG: print "found shortest path from {} to {}".format(here, there)
+        if DEBUG: print "found shortest path from {0} to {1}".format(here, there)
         return path
       heapq.heappop(tovisit)
       visited.add(current)
@@ -382,7 +382,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
            # visit this node again in the future
            # (even if already visited, because now we know a shorter route)
            heapq.heappush(tovisit, (fscore[pn], random.randrange(rrng), pn) )
-    if DEBUG: print "no path from {} to {}".format(here, there)
+    if DEBUG: print "no path from {0} to {1}".format(here, there)
     return None
 
 class EnumerateConstants(object):
