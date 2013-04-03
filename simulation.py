@@ -849,7 +849,7 @@ class Simulation(SimObject):
       for v in sectorRange(RING2_RADIUS+r,RING2_RADIUS+r+1):
           self._cells[v].Add(DECK)
     # Create hubs
-    for n in (Vexor(0,0,0),)+NEIGHBORS:
+    for n in (ZERO,)+NEIGHBORS:
       hub = n*RING_RADIUS
       for v in sectorRange(HUB_RADIUS):
         self._cells[hub+v].Add(DECK)
