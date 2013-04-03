@@ -69,10 +69,6 @@ class Vexor(collections.namedtuple('VexorTuple','x y z')):
     return Vexor(-self.x, -self.y, -self.z)
   def __pos__(self):
     return self
-  def __eq__(self, other):
-    return isinstance(other, Vexor) and all(a == b for a,b in zip(self, other))
-  def __ne__(self, other):
-    return not isinstance(other, Vexor) or any(a != b for a,b in zip(self, other))
   def toSkewXY(self):
     return (self.x, self.y)
   def toRectCoords(self):
