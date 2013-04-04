@@ -116,7 +116,7 @@ class HexTileGraphicsView(QtGui.QGraphicsView):
       o = self.key2octant[(k,m)]
       self._depressedOctants.discard(o)
   def CenterOnCell(self, c):
-    cx,cy = c.Pos().toRectCoords()
+    cx,cy,_v,_w = c.Pos().toRectCoords()
     print "Centering on %s -> %g,%g" % (c,cx,cy)
     self.centerOn(QPointF(cx,-cy))
 

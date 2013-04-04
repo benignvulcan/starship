@@ -6,7 +6,7 @@ import math, random, heapq, unittest
 #from PyQt4.QtCore import QPointF, QRectF
 #from PyQt4.QtGui  import QBrush, QColor, QPen, QPolygonF
 
-from vexor import *
+from vexor5 import *
 import scheduler
 
 DEBUG = True
@@ -15,6 +15,8 @@ def sign(n): return cmp(n,0)
 
 CELL_BREADTH = 1  # meter
 CELL_APOTHEM = CELL_BREADTH / 2.0
+
+NEIGHBORS = NEIGHBORS_4D
 
 #===============================================================================
 
@@ -849,7 +851,7 @@ class Simulation(SimObject):
       for v in sectorRange(RING2_RADIUS+r,RING2_RADIUS+r+1):
           self._cells[v].Add(DECK)
     # Create hubs
-    for n in (ZERO,)+NEIGHBORS:
+    for n in (ZERO,)+NEIGHBORS_2D:
       hub = n*RING_RADIUS
       for v in sectorRange(HUB_RADIUS):
         self._cells[hub+v].Add(DECK)
