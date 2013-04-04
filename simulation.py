@@ -50,6 +50,8 @@ class Job(object):
     self.amountToDo -= 1
   def Finish(self, claimant):
     pass
+  def CanWorkOnJobFrom(self):
+    pass
 class Construct(Job):
   def Finish(self, claimant):
     # target is a cell
@@ -60,6 +62,9 @@ class Construct(Job):
     self.target.Add(self.obj)
     self.target.Changed()
     super(Construct,self).Finish(claimant)
+  def CellsToWorkFrom(self):
+    adjacentCells = filter(lambda c: c.isTraversable(), self.target.ExistingNeighbors())
+    return adjacentCells
 class Unconstruct(Job):
   def Finish(self, claimant):
     self.target.Discard(DECK)
@@ -500,6 +505,7 @@ class Cell(SimObject):
     return False
 
 class Character(SimObject):
+  def Region(self): return self.Cell()._region
   def Cell(self): return self._parent
   def MoveTo(self, dest):
     c = self._parent
@@ -517,30 +523,20 @@ class NPC(Character):
     self._job = None
     self._path = []
   def Cycle(self, _unusedInput):
-    #if self._job is None and random.choice([True,False]):
-    #  self.LookForJob()
     if self._job:
       self.JobWalk()
     else:
       self.DrunkWalk()
   def isIdle(self):
     return self._job is None
-  def LookForJob(self):
-    if not self._job is None:
-      return
-    jobs = self.Simulation().GetUnclaimedJobs()
-    myRegion = self.Cell()._region
-    jobs = [j for j in jobs if myRegion in [c._region for c in j.target.ExistingNeighbors()]]
-    here = self._parent.Pos()
-    # Assuming job.target is a cell...
-    jobs.sort(key=lambda j: here.manhattanDistance(j.target.Pos()))
-    for j in jobs:
-      p = self.PathTo(j.target.Pos())
-      if p:
-        self._path = p
-        self.TakeJob(j, p)
-        break
-    if jobs and not self._job: print "no pathable jobs"
+  def isInterestedInJob(self, j):
+    if not self.Region() in [n._region for n in j.CellsToWorkFrom()]: return False
+    if not self._job: return True
+    distanceToCurrentJob = self.MDistanceToJob(self._job)
+    distanceToOfferedJob = self.MDistanceToJob(j)
+    return distanceToOfferedJob < distanceToCurrentJob
+  def MDistanceToJob(self, j):
+    return self.Parent().Pos().manhattanDistance(j.target.Pos())
   def TakeJob(self, j, initialPath=None):
     if not self._job is None:
       self.AbandonJob()
@@ -758,24 +754,30 @@ class JobDispatcher(object):
   def JobCount(self):
     return len(self._jobs)
   def AssignJobs(self, _):
+    
     "Match available jobs to available workers"
-    candidates = filter(lambda w: w.isIdle(), self._idleWorkers)
+    #candidates = filter(lambda w: w.isIdle(), self._idleWorkers)
+    candidates = self._workers
     if not candidates:
       return
-
     possibleJobs = filter(lambda j: not j.claimants and j.target.isAccessible(), self._jobs)
     if DEBUG: print "Possible Jobs:", possibleJobs
+    if not possibleJobs:
+      return
+
     for j in possibleJobs:
       adjacentRegions = [n._region for n in j.target.ExistingNeighbors()]
       candidatesInRegion = filter(lambda w: w.Parent()._region in adjacentRegions, candidates)
       if not candidatesInRegion: continue
-      nearest = min(candidatesInRegion, key=lambda w:w.Parent().Pos().manhattanDistance(j.target.Pos()));
-      p = nearest.PathTo(j.target.Pos())
-      nearest.TakeJob(j, p)
-      candidates.remove(nearest)
-      if not candidates:
-        return
-      
+      candidatesInRegion.sort(key=lambda w:w.MDistanceToJob(j))
+      for c in candidatesInRegion:
+        if c.isInterestedInJob(j):
+          #p = c.PathTo(j.target.Pos())
+          c.TakeJob(j, None)
+          break
+    if DEBUG: print "Recursively calling AssignJobs()"
+    self.AssignJobs(0)
+
 class Simulation(SimObject):
 
   def __init__(self, qparent):
