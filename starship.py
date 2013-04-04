@@ -109,12 +109,32 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     self.frameUpdate()
 
   @QtCore.pyqtSlot()
+  def on_actionQuickDeck_triggered(self):
+    print "actionQuickDeck"
+    for gtile in self._scene.selectedItems():
+      if not simulation.DECK in gtile._cell._objects:
+        gtile._cell.Discard(simulation.BULKHEAD)
+        gtile._cell.Add(simulation.DECK)
+        #gtile._cell.Changed()
+    self.frameUpdate()
+
+  @QtCore.pyqtSlot()
   def on_actionBuildBulkhead_triggered(self):
     print "actionBuildBulkhead"
     for gtile in self._scene.selectedItems():
       if not simulation.BULKHEAD in gtile._cell._objects:
         self._simModel.PostJob( simulation.Construct(gtile._cell, simulation.BULKHEAD) )
       else: print "%s already contains bulkhead" % (gtile._cell.Pos(),)
+    self.frameUpdate()
+
+  @QtCore.pyqtSlot()
+  def on_actionQuickBulkhead_triggered(self):
+    print "actionQuickBulkhead"
+    for gtile in self._scene.selectedItems():
+      if not simulation.BULKHEAD in gtile._cell._objects:
+        gtile._cell.Discard(simulation.DECK)
+        gtile._cell.Add(simulation.BULKHEAD)
+        #gtile._cell.Changed()
     self.frameUpdate()
 
   @QtCore.pyqtSlot()

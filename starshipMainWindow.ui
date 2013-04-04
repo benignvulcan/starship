@@ -77,6 +77,11 @@
     <addaction name="actionBuildBulkhead"/>
     <addaction name="separator"/>
     <addaction name="actionUnbuild"/>
+    <addaction name="separator"/>
+    <addaction name="actionCancelJob"/>
+    <addaction name="separator"/>
+    <addaction name="actionQuickDeck"/>
+    <addaction name="actionQuickBulkhead"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuBuild"/>
@@ -314,6 +319,21 @@
   <action name="actionUnbuild">
    <property name="text">
     <string>&amp;Un-build</string>
+   </property>
+  </action>
+  <action name="actionCancelJob">
+   <property name="text">
+    <string>&amp;Cancel Job</string>
+   </property>
+  </action>
+  <action name="actionQuickDeck">
+   <property name="text">
+    <string>Quick Deck</string>
+   </property>
+  </action>
+  <action name="actionQuickBulkhead">
+   <property name="text">
+    <string>Quick Bulkhead</string>
    </property>
   </action>
  </widget>
