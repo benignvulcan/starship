@@ -103,7 +103,7 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     n = 13
     for v in cells.iterkeys():
       h = GraphicsTileItem(cells[v], parent=None)
-      x, y = v.toRectCoords()
+      x, y, _v, _w = v.toRectCoords()
       h.moveBy(x,-y)
       #u = abs(round(v.x))%2 + abs(round(v.y))%2 + abs(round(v.z))%2  # dotted
       #u = ( abs(round(v.x)) + abs(round(v.y)) + abs(round(v.z)) )%3   # concentric
@@ -141,7 +141,7 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     changedCells = self._model.PopChanges()
     #print "UpdateFromModel(): changedCells =", changedCells
     for c in changedCells:
-      x,y = c.Pos().toRectCoords()
+      x,y, _v, _w = c.Pos().toRectCoords()
       for i in self.items(QPointF(x,-y)):
         #print i, i.boundingRect()
         #i.update()
