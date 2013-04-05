@@ -9,17 +9,28 @@ from PyQt4.QtGui  import QBrush, QColor, QPen
 from qtmath import *
 import simulation
 
-class GraphicsLayerItem(QtGui.QGraphicsItemGroup):
+#class GraphicsLayerItem(QtGui.QGraphicsItemGroup):
+class GraphicsLayerItem(QtGui.QGraphicsRectItem):
   pass
 
 class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
   ''' A graphical description of a single hexagonal cell.
   '''
 
-  polygon_vertices = RegularPolygon(n=6, apothem=simulation.CELL_APOTHEM, rotate=-math.pi/2)
+  # To minimize storage size and paint time, factor common values out into class variables.
+  hexagon_qpolyf = None
+  hexagon_qpainterpath = None
+  selection_pen = None
+
+  @classmethod
+  def InitClassVariables(cls):
+    cls.hexagon_qpolyf = RegularPolygon(n=6, apothem=simulation.CELL_APOTHEM, rotate=-math.pi/2)
+    cls.hexagon_qpainterpath = QtGui.QPainterPath()
+    cls.hexagon_qpainterpath.addPolygon(cls.hexagon_qpolyf)
+    cls.selectionPen = QtGui.QPen(QtCore.Qt.white, .05)
 
   def __init__(self, cell, parent):
-    QtGui.QGraphicsPolygonItem.__init__(self, self.polygon_vertices, parent)
+    QtGui.QGraphicsPolygonItem.__init__(self, self.hexagon_qpolyf, parent)
     self._cell = cell
     self.setFlags( self.flags()
                  | QtGui.QGraphicsItem.ItemIsSelectable
@@ -29,7 +40,6 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
                  )
     self.setPen(QtGui.QPen(QtGui.QColor(31,31,31), .05))
     self.setBrush(QtCore.Qt.yellow)
-    self.selectionPen = QtGui.QPen(QtCore.Qt.white, .05)
 
   def paint(self, painter, option, widget=0):
     bgColor = QtGui.QColor.fromHsv(*self._cell.GetBgColor())
@@ -43,9 +53,7 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
       painter.setPen(self.selectionPen)
     else:
       painter.setPen(self.pen())
-    clipping_path = QtGui.QPainterPath()
-    clipping_path.addPolygon(self.polygon())
-    painter.setClipPath(clipping_path)
+    painter.setClipPath(self.hexagon_qpainterpath)
     painter.drawConvexPolygon(self.polygon())
     #painter.drawPolygon(self.polygon())
     for o in self._cell._objects:
@@ -58,7 +66,7 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
         break
     for o in self._cell._objects:
       if isinstance(o, simulation.Player):
-        #print "painting player" #, [self.polygon_vertices[i] for i in range(6)]
+        #print "painting player" #, [self.hexagon_qpolyf[i] for i in range(6)]
         painter.setPen(self.pen())
         #painter.setBrush(QtCore.Qt.magenta)
         painter.setBrush(QtGui.QColor.fromHsv(*o.GetColor()))
@@ -78,6 +86,8 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
       painter.scale(.03, .03)
       painter.drawText(QPointF(0,0), str(self._cell._region))
 
+GraphicsTileItem.InitClassVariables()  # move this into main() if it stops working here
+
 class HexTileGraphicsScene(QtGui.QGraphicsScene):
   '''
     The graphical description of (a portion) of a hex tiled model.
@@ -91,12 +101,21 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
   def __init__(self, model):
     QtGui.QGraphicsScene.__init__(self)
     self._model = model  # simulation
+    self._vexor2item = { } # map from Vexor to [list of] GraphicsTileItem
     self._layers = {}    # map from z values to GraphicsItem layer master objects
     self._currentLayer = 0
+    self.setSceneRect(-75,-75,150,150)
     self.setBackgroundBrush(QtCore.Qt.black)
-    self.addAxisLines()
+    #self.addAxisLines()
     self.CreateLayers(self._model._cells)
+    assert self.itemIndexMethod() == QtGui.QGraphicsScene.BspTreeIndex
+    #self.setItemIndexMethod(QtGui.QGraphicsScene.NoIndex)
+    print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
     self.addCells(self._model._cells)
+    print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
+    #if self.bspTreeDepth() == 0:
+    #  self.setBspTreeDepth(6)
+    #  print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
   def addAxisLines(self):
     xaxis = QtGui.QGraphicsLineItem(-10,0,10,0)
     yaxis = QtGui.QGraphicsLineItem(0,-10,0,10)
@@ -135,6 +154,7 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
       #h.setBrush(QtGui.QColor.fromHsv( (360.0*v.x/n)%360, (256.0*v.y/n)%256, (256.0*v.z/n)%256 ))
       #h.setBrush(QtGui.QColor.fromHsv( u*120, (256.0*v.y/n)%256, (256.0*v.z/n)%256 ))
       #self.addItem(h) # redundant with actually setting a parent
+      self._vexor2item.setdefault(v,[]).append(h)
 
       #if cells[v]._objects:
       #  # create player circle object
@@ -165,8 +185,13 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     changedCells = self._model.PopChanges()
     #print "UpdateFromModel(): changedCells =", changedCells
     for c in changedCells:
-      x,y, _z, _w = c.Pos().toRectCoords()
-      for i in self.items(QPointF(x,-y)):   # this iterates all z depths
+      #x,y, _z, _w = c.Pos().toRectCoords()
+      #itms = self.items(QPointF(x,-y), QtCore.Qt.IntersectsItemBoundingRect, QtCore.Qt.AscendingOrder)
+      #itms = [self.itemAt(x,-y)]
+      itms = self._vexor2item[c.Pos()]
+      #if len(itms) > 3:
+      #  print "{n} items at {x},{y}: {items}".format(n=len(itms),x=x,y=-y,items=itms)
+      for i in itms:   # this iterates all z depths
         #print i, i.boundingRect()
         #i.update()
         i.update(i.boundingRect())
