@@ -128,6 +128,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
     self._deallocatedRegions = set()  # unallocated region numbers lower than _allocRegionNum
     #self._regionPt = { }              # map from region number to a point in the region
     self._regionSizeDict = {None:0}   # map from region number to count of cells
+    self._boundsVertical = (None,None)  # ideally this would be tracked whenever setting a cell
 #  def __len__(self): return 
 #  def __getitem__(self, key):
 #    return self._cells.get[key]
@@ -135,9 +136,12 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
 #    self._cells[key] = value
   def TileMap(self):
     return self
-  def ExistingNeighborPositionsOf(self, pos):
+  def GetBoundsVertical(self):
+    "Return the pair (low,high) encompassing the lowest and highest cell."
+    return self._boundsVertical
+  def ExistingNeighborPositionsOf(self, pos, neighborVexors=NEIGHBORS):
     "Return list of all existing adjacent points"
-    return [pos+n for n in NEIGHBORS if pos+n in self]
+    return [pos+n for n in neighborVexors if pos+n in self]
   def ExistingNeighbors(self, pos):
     "Return list of all existing cells adjacent to pos"
     return [self[p] for p in self.ExistingNeighborPositionsOf(pos)]
@@ -466,18 +470,25 @@ class Cell(SimObject):
     self.Changed(self)
   def Changed(self, what=None):
     self._parent.Changed(self)
+  def isSupporter(self):
+    return BULKHEAD in self._objects
+  def isSupported(self):
+    if self._components.support:
+      return True
+    dn_pos = self._pos+DOWN
+    return dn_pos in self.TileMap() and self.TileMap()[dn_pos].isSupporter()
   def isTraversable(self):
-    return len(self._components.obstructions)==0 and not self._components.support is None
+    return len(self._components.obstructions)==0 and self.isSupported()
   def isAccessible(self):
     for n in self.ExistingNeighbors():
       if n.isTraversable(): return True
     return False
   def GetBgTexture(self):
-    if self._components.structure is None and self._components.support is None:
+    if self._components.structure is None and not self.isSupported():
       return Textures.VOID
     elif not self._components.structure is None:
       return Textures.BULKHEAD
-    elif not self._components.support is None:
+    elif self.isSupported():
       return Textures.DECK
     else:
       return None
@@ -834,52 +845,58 @@ class Simulation(SimObject):
     RING_RADIUS = 3**3
     RING2_RADIUS = RING_RADIUS * 2
     # Create cells
-    for v in sectorRange(RING2_RADIUS+HUB_RADIUS+1):
-      self._cells[v] = Cell(self._cells, v)
-      self._cells.UpdateCellRegion(v)
+    for u in sectorRange(RING2_RADIUS+HUB_RADIUS+1):
+      for v in (DOWN,ZERO,UP):
+        uv = u+v
+        self._cells[uv] = Cell(self._cells, uv)
+        self._cells.UpdateCellRegion(uv)
+    self._cells._boundsVertical = (-1,1)  # 3 layers exist
     # Create spokes
     for sextant in range(6):
       for r in range(HUB_RADIUS-2,RING2_RADIUS-2):
-        v = NEIGHBORS[sextant]*r
         for w in range(-2,3):
-          v = NEIGHBORS[sextant]*r + NEIGHBORS[(sextant+2)%6]*w
-          self._cells[v].Add(DECK)
+          v = NEIGHBORS_2D[sextant]*r + NEIGHBORS_2D[(sextant+2)%6]*w + DOWN
+          #self._cells[v].Add(DECK)
+          self._cells[v].Add(BULKHEAD)
     # Create ring(s)
     for r in range(-2, 3): # for thickness of ring
       for v in sectorRange(RING_RADIUS+r,RING_RADIUS+r+1):
-          self._cells[v].Add(DECK)
+          self._cells[v+DOWN].Add(BULKHEAD)
       for v in sectorRange(RING2_RADIUS+r,RING2_RADIUS+r+1):
-          self._cells[v].Add(DECK)
+          self._cells[v+DOWN].Add(BULKHEAD)
     # Create hubs
-    for n in (ZERO,)+NEIGHBORS_2D:
-      hub = n*RING_RADIUS
+    for v in sectorRange(HUB_RADIUS):  # create (bottom) center hub first
+        self._cells[DOWN+v].Add(BULKHEAD)
+    for n in NEIGHBORS_2D:
+      hub = n*RING_RADIUS + DOWN
       for v in sectorRange(HUB_RADIUS):
-        self._cells[hub+v].Add(DECK)
-      hub = n*RING2_RADIUS
+        self._cells[hub+v].Add(BULKHEAD)
+      hub = n*RING2_RADIUS + DOWN
       for v in sectorRange(HUB_RADIUS):
-        self._cells[hub+v].Add(DECK)
+        self._cells[hub+v].Add(BULKHEAD)
     # Find edges
     edges = set()
     for v in self._cells.keys():
-      if self._cells[v]._components.support is None:      # is there a DECK here?
+      if not self._cells[v].isSupported():                # is there a DECK here?
         continue                                          # no, skip it
-      for v2 in self._cells.ExistingNeighborPositionsOf(v):
-        if self._cells[v2]._components.support is None:   # is there a DECK adjacent?
+      for v2 in self._cells.ExistingNeighborPositionsOf(v, neighborVexors=NEIGHBORS_2D):
+        if not self._cells[v2].isSupported():             # is there a DECK adjacent?
           edges.add(v)                                    # no, so v is an edge.
           break
     # And in a separate pass, add bulkheads to edges
     for v in edges:
-      self._cells[v].Remove(DECK)
+      #self._cells[v].Remove(DECK)
       self._cells[v].Add(BULKHEAD)
-    # Create random obstructing walls in interior
-    k_traversable = [k for k in self._cells.keys() if self._cells[k].isTraversable()]
-    print "%d traversable interior" % len(k_traversable)
-    for i in range(len(k_traversable)/3):
-      v = random.choice(k_traversable)
-      #print "adding BULKHEAD at %s" % (v,)
-      self._cells[v].Remove(DECK)
-      self._cells[v].Add(BULKHEAD)
-      k_traversable.remove(v)
+    if False:
+      # Create random obstructing walls in interior
+      k_traversable = [k for k in self._cells.keys() if self._cells[k].isTraversable()]
+      print "%d traversable interior" % len(k_traversable)
+      for i in range(len(k_traversable)/3):
+        v = random.choice(k_traversable)
+        #print "adding BULKHEAD at %s" % (v,)
+        self._cells[v].Discard(DECK)
+        self._cells[v].Add(BULKHEAD)
+        k_traversable.remove(v)
 
   def Simulation(self): return self
   def Scheduler(self): return self._scheduler

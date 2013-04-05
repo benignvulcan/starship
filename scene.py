@@ -9,6 +9,9 @@ from PyQt4.QtGui  import QBrush, QColor, QPen
 from qtmath import *
 import simulation
 
+class GraphicsLayerItem(QtGui.QGraphicsItemGroup):
+  pass
+
 class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
   ''' A graphical description of a single hexagonal cell.
   '''
@@ -88,8 +91,11 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
   def __init__(self, model):
     QtGui.QGraphicsScene.__init__(self)
     self._model = model  # simulation
+    self._layers = {}    # map from z values to GraphicsItem layer master objects
+    self._currentLayer = 0
     self.setBackgroundBrush(QtCore.Qt.black)
     self.addAxisLines()
+    self.CreateLayers(self._model._cells)
     self.addCells(self._model._cells)
   def addAxisLines(self):
     xaxis = QtGui.QGraphicsLineItem(-10,0,10,0)
@@ -99,11 +105,27 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     yaxis.setPen(p)
     self.addItem(xaxis)
     self.addItem(yaxis)
+  def CreateLayers(self, cells):
+    "For each layer, create a GraphicsLayerItem to serve as it's parent."
+    (low, high) = cells.GetBoundsVertical()
+    for i in range(low, high+1):
+      y = GraphicsLayerItem()
+      y.setZValue(i)
+      self.addItem(y)
+      self._layers[i] = y
+      y.setVisible(i == self._currentLayer)
+    print "{0} layers created".format(len(self._layers))
+  def FlipLayer(self, delta):
+    newLayer = self._currentLayer + delta
+    if newLayer in self._layers:
+      self._currentLayer = newLayer
+      for i in self._layers:
+        self._layers[i].setVisible(i == self._currentLayer)
   def addCells(self, cells):
     n = 13
     for v in cells.iterkeys():
-      h = GraphicsTileItem(cells[v], parent=None)
-      x, y, _v, _w = v.toRectCoords()
+      x, y, z, _w = v.toRectCoords()
+      h = GraphicsTileItem(cells[v], parent=self._layers[z])
       h.moveBy(x,-y)
       #u = abs(round(v.x))%2 + abs(round(v.y))%2 + abs(round(v.z))%2  # dotted
       #u = ( abs(round(v.x)) + abs(round(v.y)) + abs(round(v.z)) )%3   # concentric
@@ -112,7 +134,7 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
       #u = ( abs(round(v.x)) + abs(round(v.y)) )%3
       #h.setBrush(QtGui.QColor.fromHsv( (360.0*v.x/n)%360, (256.0*v.y/n)%256, (256.0*v.z/n)%256 ))
       #h.setBrush(QtGui.QColor.fromHsv( u*120, (256.0*v.y/n)%256, (256.0*v.z/n)%256 ))
-      self.addItem(h)
+      #self.addItem(h) # redundant with actually setting a parent
 
       #if cells[v]._objects:
       #  # create player circle object
@@ -131,6 +153,8 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
         textItem.scale(ts,ts)
         textItem.moveBy(x-.25,-y-.1)
         self.addItem(textItem)
+    print "{0} GraphicsTileItems created".format(len(cells))
+
   def Model(self): return self._model
 
   def UpdateFromModel(self):
@@ -141,8 +165,8 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     changedCells = self._model.PopChanges()
     #print "UpdateFromModel(): changedCells =", changedCells
     for c in changedCells:
-      x,y, _v, _w = c.Pos().toRectCoords()
-      for i in self.items(QPointF(x,-y)):
+      x,y, _z, _w = c.Pos().toRectCoords()
+      for i in self.items(QPointF(x,-y)):   # this iterates all z depths
         #print i, i.boundingRect()
         #i.update()
         i.update(i.boundingRect())
