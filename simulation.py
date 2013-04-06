@@ -804,7 +804,7 @@ class Simulation(SimObject):
     count = len(self._cells)
     print count,"cells created"
 
-    startVexors = [k for k in self._cells.keys() if self._cells[k].isTraversable()]
+    startVexors = [k for k in self._cells.keys() if k.v==0 and self._cells[k].isTraversable()]
     startVexors.sort(key=lambda k: k.manhattanLength())
 
     #startCell = self._cells[Vexor(0,0,0)]
