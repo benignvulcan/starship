@@ -79,12 +79,16 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
         #painter.drawRect(-1,-1,1,1)
         #painter.drawConvexPolygon(self.polygon())
     if False:
-      # paint region number
+      # paint some debugging text
+      painter.setPen(QtCore.Qt.white)
       painter.setBrush(self.brush())
-      painter.setPen(QtCore.Qt.yellow)
       #painter.setFont(QtGui.QFont("Helvetica", 8))
-      painter.scale(.03, .03)
-      painter.drawText(QPointF(0,0), str(self._cell._region))
+      scale = .02
+      painter.scale(scale,scale)
+      r = QtCore.QRectF(-.5/scale,-.5/scale,1/scale,1/scale)
+      txt = "{0},{1},{2}".format(self._cell.Pos().x, self._cell.Pos().y, self._cell.Pos().z)
+      #txt = str(self._cell._region)
+      painter.drawText(r, QtCore.Qt.AlignCenter, txt)
 
 GraphicsTileItem.InitClassVariables()  # move this into main() if it stops working here
 
