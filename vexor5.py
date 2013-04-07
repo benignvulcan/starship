@@ -117,9 +117,7 @@ def sectorRange(r=None, rstop=None, rstep=1, sextant_start=0, sextant_stop=6, se
         x += sextant_step
     r += rstep
 
-def texture1(v):
-  "A basic 3-coloring for hexagonal tiling."
-  values = \
+_uniform1coloring_map = \
     { (0,0) : 0
     , (1,0) : 1
     , (2,0) : 2
@@ -130,10 +128,17 @@ def texture1(v):
     , (1,2) : 2
     , (2,2) : 0
     }
+
+def uniform1coloring(v):
+  '"1-uniform" 3-coloring for hexagonal tiling.'
+  # See http://en.wikipedia.org/w/index.php?title=Hexagonal_tiling
   x,y = v.toSkewXY()
-  x %= 3
-  y %= 3
-  return values[(x,y)]
+  return _uniform1coloring_map[(x%3,y%3)]
+
+def uniform2coloring(v):
+  '"2-uniform" 4-coloring for hexagonal tiling.'
+  x,y = v.toSkewXY()
+  return ((x&1)<<1) | (y&1)
 
 ZERO = Vexor(0,0,0, 0,0)
 

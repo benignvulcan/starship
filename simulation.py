@@ -502,7 +502,7 @@ class Cell(SimObject):
     h,s,v = self.textures2hsv[tx]
     if tx in (Textures.BULKHEAD, Textures.DECK):
       #h,s,v = (h, s, v + (id(self)%3)*16 )
-      tupity = texture1(self._pos)
+      tupity = uniform1coloring(self._pos)
       h,s,v = (h, s, v + tupity*16 )
     return (h,s,v)
   def isTargeted(self):
