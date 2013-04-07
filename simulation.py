@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import math, random, heapq, unittest
+import math, random, heapq, unittest, pprint
 #from PyQt4 import QtCore #, QtGui, uic
 #from PyQt4.QtCore import QPointF, QRectF
 #from PyQt4.QtGui  import QBrush, QColor, QPen, QPolygonF
@@ -42,7 +42,7 @@ class Job(object):
     self.timestamp = timestamp
     self.claimants = []
   def __repr__(self):
-   return "<Job target=%s, todo=%s>" % (self.target, self.amountToDo)
+   return "<Job target=%s, obj=%s" % (self.target, self.obj)
   def isSimilar(self, other):
     return type(self) == type(other) and self.target == other.target and self.obj == other.obj
   def Start(self, claimant):
@@ -343,7 +343,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
       there = frozenset([there])
     if not there: return None
     if here in there: return []   # can't get any closer!
-    if DEBUG: print "Path From {0} to {1}".format(here, there) 
+    # if DEBUG: print "Path From {0} to {1}".format(here, there) 
     if randomize:
       # randomly prioritize equidistant choices
       rrng = 2**30
@@ -369,7 +369,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
         while current in came_from:
           current = came_from[current]
           path.append(current)
-        if DEBUG: print "found shortest path from {0} to {1}".format(here, there)
+        # if DEBUG: print "found shortest path from {0} to {1}".format(here, there)
         return path
       heapq.heappop(tovisit)
       visited.add(current)
@@ -400,12 +400,16 @@ class EnumerateConstants(object):
 Textures = EnumerateConstants("VOID DECK BULKHEAD")
 
 class Deck(SimObject):
+  def __repr__(self):
+    return "DECK"
   def RegisterComponent(self, components):
     #components.Discard(BULKHEAD)
     components.support = self
     components.ChangedTopology(self)
 DECK = Deck()  # Deck singleton
 class Bulkhead(SimObject):
+  def __repr__(self):
+    return "BULKHEAD"
   def RegisterComponent(self, components):
     #components.Discard(DECK)
     components.structure = self
@@ -447,6 +451,8 @@ class Cell(SimObject):
     self._components = Cell.Components(self)  # specific _objects that fulfill various component roles
     self._futureLook = []       # stuff to be built/installed/uninstalled ?
     self._region = None
+  def __repr__(self):
+    return "<Cell pos={0}".format((self._pos))
   def Pos(self): return self._pos
   def ExistingNeighbors(self):
     return self.TileMap().ExistingNeighbors(self._pos)
@@ -524,6 +530,8 @@ class NPC(Character):
     self._lastDirection = NEIGHBORS[0]
     self._job = None
     self._path = []
+  def __repr__(self):
+    return "<NPC: cell={0}, job={1}>".format(self.Cell(), self._job)
   def Cycle(self, _unusedInput):
     if self._job:
       self.JobWalk()
@@ -537,6 +545,18 @@ class NPC(Character):
     distanceToCurrentJob = self.MDistanceToJob(self._job)
     distanceToOfferedJob = self.MDistanceToJob(j)
     return distanceToOfferedJob < distanceToCurrentJob
+  def OfferJob(self, j):
+    if DEBUG: print "Offering job {0} to NPC {1}".format(j, self)
+    if not self.isInterestedInJob(j):
+      if DEBUG: print "Not interested in Job {0}".format(j)
+      return j
+    if DEBUG: print "Taking job {0} in favor of job {1}".format(j,self._job)
+    oldJob = self._job
+    if oldJob:
+      self.AbandonJob()
+    self.TakeJob(j)
+    return oldJob    
+      
   def MDistanceToJob(self, j):
     return self.Parent().Pos().manhattanDistance(j.target.Pos())
   def TakeJob(self, j, initialPath=None):
@@ -740,11 +760,13 @@ class JobDispatcher(object):
   def ClaimJob(self, claimant, j):
     print "ClaimJob", j
     assert j in self._jobs
+    assert not j.claimants
     j.claimants.append(claimant)
   def UnclaimJob(self, claimant, j):
-    print "UnclaimJob", j
+    if DEBUG: print "UnclaimJob", j, j.claimants, claimant
     assert j in self._jobs
     j.claimants.remove(claimant)
+    if DEBUG: print "Remaining Claiminants:", j.claimants
   def GetUnclaimedJobs(self):
     return [j for j in self._jobs if len(j.claimants)==0]
   def FinishJob(self, j):
@@ -762,23 +784,36 @@ class JobDispatcher(object):
     candidates = self._workers
     if not candidates:
       return
-    possibleJobs = filter(lambda j: not j.claimants and j.target.isAccessible(), self._jobs)
-    if DEBUG: print "Possible Jobs:", possibleJobs
-    if not possibleJobs:
+    accessibleJobs = filter(lambda j: j.target.isAccessible(), self._jobs)
+    if not accessibleJobs:
       return
 
-    for j in possibleJobs:
+    if DEBUG: print "Accessible Jobs:", accessibleJobs
+
+    possibleMatches = {}
+    possibleMatches[None] = None
+    
+    for j in accessibleJobs:
       adjacentRegions = [n._region for n in j.target.ExistingNeighbors()]
       candidatesInRegion = filter(lambda w: w.Parent()._region in adjacentRegions, candidates)
-      if not candidatesInRegion: continue
       candidatesInRegion.sort(key=lambda w:w.MDistanceToJob(j))
-      for c in candidatesInRegion:
-        if c.isInterestedInJob(j):
-          #p = c.PathTo(j.target.Pos())
-          c.TakeJob(j, None)
+      candidatesInRegion.reverse()
+      possibleMatches[j] = candidatesInRegion
+
+    if DEBUG: print "Possible Matches:", pprint.pprint(possibleMatches)
+#    possibleJobs = filter(lambda j: not j.claimants, accessibleJobs)
+#    if DEBUG: print "possible Jobs:", possibleJobs
+
+    for j in accessibleJobs:
+      job = j
+      while job:
+        if DEBUG: print "Finding Match for job {0}".format(job)
+        if not possibleMatches[job]: 
           break
-    if DEBUG: print "Recursively calling AssignJobs()"
-    self.AssignJobs(0)
+        candidate = possibleMatches[job].pop()
+        job = candidate.OfferJob(job)
+        
+        
 
 class Simulation(SimObject):
 
