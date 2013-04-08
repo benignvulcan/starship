@@ -8,6 +8,20 @@ from PyQt4.QtGui  import QBrush, QColor, QPen
 
 from qtmath import *
 import simulation
+import vexor5
+
+textures2hsv = \
+  { simulation.Textures.VOID      : (  0,   0,   0)
+  , simulation.Textures.BULKHEAD  : (240,  15,  63)
+  , simulation.Textures.DECK      : (200,  15, 191)
+  }
+def Texture2HSV(tx, pos):
+  'Given a texture and a vexor position, return a color.'
+  h,s,v = textures2hsv[tx]
+  if tx in (simulation.Textures.BULKHEAD, simulation.Textures.DECK):
+    tupity = vexor5.uniform1coloring(pos)
+    h,s,v = (h, s, v + tupity*16 )
+  return (h,s,v)
 
 #class GraphicsLayerItem(QtGui.QGraphicsItemGroup):
 class GraphicsLayerItem(QtGui.QGraphicsRectItem):
@@ -32,6 +46,7 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
   def __init__(self, cell, parent):
     QtGui.QGraphicsPolygonItem.__init__(self, self.hexagon_qpolyf, parent)
     self._cell = cell
+    self._renderSpec = []   # a list of instructions on how to render this cell
     self.setFlags( self.flags()
                  | QtGui.QGraphicsItem.ItemIsSelectable
                  | QtGui.QGraphicsItem.ItemIsFocusable
@@ -40,44 +55,32 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
                  )
     self.setPen(QtGui.QPen(QtGui.QColor(31,31,31), .05))
     self.setBrush(QtCore.Qt.yellow)
+    self.UpdateRenderSpec()
+
+  def UpdateRenderSpec(self):
+    self._renderSpec = self._cell.GetRenderSpec()
 
   def paint(self, painter, option, widget=0):
-    bgColor = QtGui.QColor.fromHsv(*self._cell.GetBgColor())
-    if self._cell.isTargeted():
-      brush = QBrush(bgColor, QtCore.Qt.Dense4Pattern)
-      brush.setTransform(QtGui.QTransform.fromScale(.1,.1))
-    else:
-      brush = QBrush(bgColor)
-    painter.setBrush(brush)
-    if self.isSelected():
-      painter.setPen(self.selectionPen)
-    else:
-      painter.setPen(self.pen())
     painter.setClipPath(self.hexagon_qpainterpath)
-    painter.drawConvexPolygon(self.polygon())
-    #painter.drawPolygon(self.polygon())
-    for o in self._cell._objects:
-      if isinstance(o, simulation.NPC):
-        painter.setPen(self.pen())
-        #painter.setBrush(QtCore.Qt.blue)
-        painter.setBrush(QtGui.QColor.fromHsv(*o.GetColor()))
+    painter.setPen(QtCore.Qt.NoPen)
+    for (renderObj, arg) in self._renderSpec:
+      if renderObj == simulation.RenderObjects.BG:
+        painter.setBrush(QBrush(QtGui.QColor.fromHsv(*Texture2HSV(arg, self._cell.Pos()))))
+        if self.isSelected():
+          painter.setPen(self.selectionPen)
+        else:
+          painter.setPen(self.pen())
+        painter.drawConvexPolygon(self.polygon())
+        painter.setPen(QtCore.Qt.NoPen)
+      elif renderObj == simulation.RenderObjects.TARGETING:
+        brush = QBrush(QtGui.QColor(255,127,0), QtCore.Qt.Dense4Pattern)
+        brush.setTransform(QtGui.QTransform.fromScale(.1,.1))
+        painter.setBrush(brush)
+        painter.drawConvexPolygon(self.polygon())
+      elif renderObj == simulation.RenderObjects.NPC or renderObj == simulation.RenderObjects.PLAYER:
+        painter.setBrush(QtGui.QColor.fromHsv(*arg))
         r = simulation.CELL_APOTHEM*3/4.0
         painter.drawEllipse(QPointF(0,0), r, r)
-        break
-    for o in self._cell._objects:
-      if isinstance(o, simulation.Player):
-        #print "painting player" #, [self.hexagon_qpolyf[i] for i in range(6)]
-        painter.setPen(self.pen())
-        #painter.setBrush(QtCore.Qt.magenta)
-        painter.setBrush(QtGui.QColor.fromHsv(*o.GetColor()))
-        #painter.setPen(QtCore.Qt.magenta)
-        r = simulation.CELL_APOTHEM*3/4.0
-        #print "draw(%s,%s,%s,%s)" % (-r,-r,2*r,2*r)
-        painter.drawEllipse(QPointF(0,0), r, r)
-        #painter.drawRect(-r,-r,2*r,2*r)
-        #painter.drawRect(-1,-1,2,2)
-        #painter.drawRect(-1,-1,1,1)
-        #painter.drawConvexPolygon(self.polygon())
     if False:
       # paint some debugging text
       painter.setPen(QtCore.Qt.white)
@@ -198,6 +201,7 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
       for i in itms:   # this iterates all z depths
         #print i, i.boundingRect()
         #i.update()
+        i.UpdateRenderSpec()
         i.update(i.boundingRect())
     if not self._model._centerOn is None:
       for v in self.views():

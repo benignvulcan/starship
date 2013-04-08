@@ -397,6 +397,7 @@ class EnumerateConstants(object):
       setattr(self, name, number)
 
 Textures = EnumerateConstants("VOID DECK BULKHEAD")
+RenderObjects = EnumerateConstants("BG TARGETING PLAYER NPC")
 
 class Deck(SimObject):
   def RegisterComponent(self, components):
@@ -492,19 +493,23 @@ class Cell(SimObject):
       return Textures.DECK
     else:
       return None
-  textures2hsv = \
-    { Textures.VOID      : (  0,   0,   0)
-    , Textures.BULKHEAD  : (240,  15,  63)
-    , Textures.DECK      : (200,  15, 191)
-    }
-  def GetBgColor(self):
-    tx = self.GetBgTexture()
-    h,s,v = self.textures2hsv[tx]
-    if tx in (Textures.BULKHEAD, Textures.DECK):
-      #h,s,v = (h, s, v + (id(self)%3)*16 )
-      tupity = uniform1coloring(self._pos)
-      h,s,v = (h, s, v + tupity*16 )
-    return (h,s,v)
+  def GetRenderSpec(self):
+    'Return a list of rendering instructions for this cell.'
+    player = None
+    npc = None
+    for o in self._objects:
+      if isinstance(o, NPC):
+        npc = o
+      elif isinstance(o, Player):
+        player = o
+    seq = [ (RenderObjects.BG, self.GetBgTexture()) ]
+    if self.isTargeted():
+      seq.append( (RenderObjects.TARGETING, None) )
+    if player:
+      seq.append( (RenderObjects.PLAYER, player.GetColor()) )
+    elif npc:
+      seq.append( (RenderObjects.NPC, npc.GetColor()) )
+    return seq
   def isTargeted(self):
     return len(self._futureLook) > 0
   def containsInstanceOf(self, klass):
