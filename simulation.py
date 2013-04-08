@@ -9,7 +9,7 @@ import math, random, heapq, unittest, pprint
 from vexor5 import *
 import scheduler
 
-DEBUG = True
+DEBUG = False
 
 def sign(n): return cmp(n,0)
 
@@ -552,8 +552,6 @@ class NPC(Character):
       return j
     if DEBUG: print "Taking job {0} in favor of job {1}".format(j,self._job)
     oldJob = self._job
-    if oldJob:
-      self.AbandonJob()
     self.TakeJob(j)
     return oldJob    
       
@@ -581,6 +579,7 @@ class NPC(Character):
     if self._path is None:
       self._path = self.PathTo(self._job.target.Pos())
     if self._path is None or self._path == []:
+      print "Abandoning Job {0} because path is {1}".format(self._job, self._path)
       self.AbandonJob()
       return # can't get there
     if not self._job.target.Pos() == self._path[0]:
@@ -741,7 +740,7 @@ class JobDispatcher(object):
     self._workers = set()
     self._idleWorkers = set()
     self._process = self._simulation.Scheduler().CreateProcess(self.AssignJobs)
-    self._simulation.Scheduler().PostEvent(self._process, dt=1, recurring=True)
+    self._simulation.Scheduler().PostEvent(self._process, dt=10, recurring=True)
   def AddWorker(self, anNPC):
     self._workers.add(anNPC)
     self._idleWorkers.add(anNPC)
@@ -751,14 +750,14 @@ class JobDispatcher(object):
   def PostJob(self, j):
     assert j.claimants == []
     if any(j.isSimilar(b) for b in self._jobs):
-      print "discarding duplicate job posting"
+      if DEBUG: print "discarding duplicate job posting"
       return
     self._jobs.append(j)
     # Assuming target is a cell...
     j.target._futureLook.append(j)
     j.target.Changed()
   def ClaimJob(self, claimant, j):
-    print "ClaimJob", j
+    if DEBUG: print "ClaimJob", j
     assert j in self._jobs
     assert not j.claimants
     j.claimants.append(claimant)
@@ -766,7 +765,7 @@ class JobDispatcher(object):
     if DEBUG: print "UnclaimJob", j, j.claimants, claimant
     assert j in self._jobs
     j.claimants.remove(claimant)
-    if DEBUG: print "Remaining Claiminants:", j.claimants
+    if j.claimants: print "Remaining Claiminants:", j.claimants
   def GetUnclaimedJobs(self):
     return [j for j in self._jobs if len(j.claimants)==0]
   def FinishJob(self, j):
@@ -777,14 +776,24 @@ class JobDispatcher(object):
       print "  job %s not found" % j
   def JobCount(self):
     return len(self._jobs)
-  def AssignJobs(self, _):
-    
+
+  def FindCandidatesForJob(self, j, candidates):
+    adjacentRegions = [n._region for n in j.target.ExistingNeighbors()]
+    candidatesInRegion = filter(lambda w: w.Parent()._region in adjacentRegions, candidates)
+    candidatesInRegion.sort(key=lambda w:w.MDistanceToJob(j))
+    candidatesInRegion.reverse()
+    return candidatesInRegion
+
+  def AssignJobs(self, _):    
     "Match available jobs to available workers"
+    print "Assigning jobs"
     #candidates = filter(lambda w: w.isIdle(), self._idleWorkers)
     candidates = self._workers
+    print len(candidates)," Candidate Workers"
     if not candidates:
       return
     accessibleJobs = filter(lambda j: j.target.isAccessible(), self._jobs)
+    print len(accessibleJobs), " Accessible Jobs"
     if not accessibleJobs:
       return
 
@@ -794,17 +803,15 @@ class JobDispatcher(object):
     possibleMatches[None] = None
     
     for j in accessibleJobs:
-      adjacentRegions = [n._region for n in j.target.ExistingNeighbors()]
-      candidatesInRegion = filter(lambda w: w.Parent()._region in adjacentRegions, candidates)
-      candidatesInRegion.sort(key=lambda w:w.MDistanceToJob(j))
-      candidatesInRegion.reverse()
-      possibleMatches[j] = candidatesInRegion
+      possibleMatches[j] = self.FindCandidatesForJob(j,candidates)
 
     if DEBUG: print "Possible Matches:", pprint.pprint(possibleMatches)
 #    possibleJobs = filter(lambda j: not j.claimants, accessibleJobs)
 #    if DEBUG: print "possible Jobs:", possibleJobs
 
     for j in accessibleJobs:
+      for c in j.claimants:
+        c.AbandonJob()
       job = j
       while job:
         if DEBUG: print "Finding Match for job {0}".format(job)
