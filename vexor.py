@@ -150,7 +150,7 @@ def sectorRange(r=None, rstop=None, rstep=1, sextant_start=0, sextant_stop=6, se
         x += sextant_step
     r += rstep
 
-def texture1(v):
+def uniform1coloring(v):
   "A basic 3-coloring for hexagonal tiling."
   values = \
     { (0,0) : 0

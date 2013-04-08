@@ -8,16 +8,45 @@ from PyQt4.QtGui  import QBrush, QColor, QPen
 
 from qtmath import *
 import simulation
+import vexor5
+
+textures2hsv = \
+  { simulation.Textures.VOID      : (  0,   0,   0)
+  , simulation.Textures.BULKHEAD  : (240,  15,  63)
+  , simulation.Textures.DECK      : (200,  15, 191)
+  }
+def Texture2HSV(tx, pos):
+  'Given a texture and a vexor position, return a color.'
+  h,s,v = textures2hsv[tx]
+  if tx in (simulation.Textures.BULKHEAD, simulation.Textures.DECK):
+    tupity = vexor5.uniform1coloring(pos)
+    h,s,v = (h, s, v + tupity*16 )
+  return (h,s,v)
+
+#class GraphicsLayerItem(QtGui.QGraphicsItemGroup):
+class GraphicsLayerItem(QtGui.QGraphicsRectItem):
+  pass
 
 class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
   ''' A graphical description of a single hexagonal cell.
   '''
 
-  polygon_vertices = RegularPolygon(n=6, apothem=simulation.CELL_APOTHEM, rotate=-math.pi/2)
+  # To minimize storage size and paint time, factor common values out into class variables.
+  hexagon_qpolyf = None
+  hexagon_qpainterpath = None
+  selection_pen = None
+
+  @classmethod
+  def InitClassVariables(cls):
+    cls.hexagon_qpolyf = RegularPolygon(n=6, apothem=simulation.CELL_APOTHEM, rotate=-math.pi/2)
+    cls.hexagon_qpainterpath = QtGui.QPainterPath()
+    cls.hexagon_qpainterpath.addPolygon(cls.hexagon_qpolyf)
+    cls.selectionPen = QtGui.QPen(QtCore.Qt.white, .05)
 
   def __init__(self, cell, parent):
-    QtGui.QGraphicsPolygonItem.__init__(self, self.polygon_vertices, parent)
+    QtGui.QGraphicsPolygonItem.__init__(self, self.hexagon_qpolyf, parent)
     self._cell = cell
+    self._renderSpec = []   # a list of instructions on how to render this cell
     self.setFlags( self.flags()
                  | QtGui.QGraphicsItem.ItemIsSelectable
                  | QtGui.QGraphicsItem.ItemIsFocusable
@@ -26,54 +55,45 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
                  )
     self.setPen(QtGui.QPen(QtGui.QColor(31,31,31), .05))
     self.setBrush(QtCore.Qt.yellow)
-    self.selectionPen = QtGui.QPen(QtCore.Qt.white, .05)
+    self.UpdateRenderSpec()
+
+  def UpdateRenderSpec(self):
+    self._renderSpec = self._cell.GetRenderSpec()
 
   def paint(self, painter, option, widget=0):
-    bgColor = QtGui.QColor.fromHsv(*self._cell.GetBgColor())
-    if self._cell.isTargeted():
-      brush = QBrush(bgColor, QtCore.Qt.Dense4Pattern)
-      brush.setTransform(QtGui.QTransform.fromScale(.1,.1))
-    else:
-      brush = QBrush(bgColor)
-    painter.setBrush(brush)
-    if self.isSelected():
-      painter.setPen(self.selectionPen)
-    else:
-      painter.setPen(self.pen())
-    clipping_path = QtGui.QPainterPath()
-    clipping_path.addPolygon(self.polygon())
-    painter.setClipPath(clipping_path)
-    painter.drawConvexPolygon(self.polygon())
-    #painter.drawPolygon(self.polygon())
-    for o in self._cell._objects:
-      if isinstance(o, simulation.NPC):
-        painter.setPen(self.pen())
-        #painter.setBrush(QtCore.Qt.blue)
-        painter.setBrush(QtGui.QColor.fromHsv(*o.GetColor()))
+    painter.setClipPath(self.hexagon_qpainterpath)
+    painter.setPen(QtCore.Qt.NoPen)
+    for (renderObj, arg) in self._renderSpec:
+      if renderObj == simulation.RenderObjects.BG:
+        painter.setBrush(QBrush(QtGui.QColor.fromHsv(*Texture2HSV(arg, self._cell.Pos()))))
+        if self.isSelected():
+          painter.setPen(self.selectionPen)
+        else:
+          painter.setPen(self.pen())
+        painter.drawConvexPolygon(self.polygon())
+        painter.setPen(QtCore.Qt.NoPen)
+      elif renderObj == simulation.RenderObjects.TARGETING:
+        brush = QBrush(QtGui.QColor(255,127,0), QtCore.Qt.Dense4Pattern)
+        brush.setTransform(QtGui.QTransform.fromScale(.1,.1))
+        painter.setBrush(brush)
+        painter.drawConvexPolygon(self.polygon())
+      elif renderObj == simulation.RenderObjects.NPC or renderObj == simulation.RenderObjects.PLAYER:
+        painter.setBrush(QtGui.QColor.fromHsv(*arg))
         r = simulation.CELL_APOTHEM*3/4.0
         painter.drawEllipse(QPointF(0,0), r, r)
-        break
-    for o in self._cell._objects:
-      if isinstance(o, simulation.Player):
-        #print "painting player" #, [self.polygon_vertices[i] for i in range(6)]
-        painter.setPen(self.pen())
-        #painter.setBrush(QtCore.Qt.magenta)
-        painter.setBrush(QtGui.QColor.fromHsv(*o.GetColor()))
-        #painter.setPen(QtCore.Qt.magenta)
-        r = simulation.CELL_APOTHEM*3/4.0
-        #print "draw(%s,%s,%s,%s)" % (-r,-r,2*r,2*r)
-        painter.drawEllipse(QPointF(0,0), r, r)
-        #painter.drawRect(-r,-r,2*r,2*r)
-        #painter.drawRect(-1,-1,2,2)
-        #painter.drawRect(-1,-1,1,1)
-        #painter.drawConvexPolygon(self.polygon())
     if False:
-      # paint region number
+      # paint some debugging text
+      painter.setPen(QtCore.Qt.white)
       painter.setBrush(self.brush())
-      painter.setPen(QtCore.Qt.yellow)
       #painter.setFont(QtGui.QFont("Helvetica", 8))
-      painter.scale(.03, .03)
-      painter.drawText(QPointF(0,0), str(self._cell._region))
+      scale = .02
+      painter.scale(scale,scale)
+      r = QtCore.QRectF(-.5/scale,-.5/scale,1/scale,1/scale)
+      txt = "{0},{1},{2}".format(self._cell.Pos().x, self._cell.Pos().y, self._cell.Pos().z)
+      #txt = str(self._cell._region)
+      painter.drawText(r, QtCore.Qt.AlignCenter, txt)
+
+GraphicsTileItem.InitClassVariables()  # move this into main() if it stops working here
 
 class HexTileGraphicsScene(QtGui.QGraphicsScene):
   '''
@@ -88,9 +108,21 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
   def __init__(self, model):
     QtGui.QGraphicsScene.__init__(self)
     self._model = model  # simulation
+    self._vexor2item = { } # map from Vexor to [list of] GraphicsTileItem
+    self._layers = {}    # map from z values to GraphicsItem layer master objects
+    self._currentLayer = 0
+    self.setSceneRect(-75,-75,150,150)
     self.setBackgroundBrush(QtCore.Qt.black)
-    self.addAxisLines()
+    #self.addAxisLines()
+    self.CreateLayers(self._model._cells)
+    assert self.itemIndexMethod() == QtGui.QGraphicsScene.BspTreeIndex
+    #self.setItemIndexMethod(QtGui.QGraphicsScene.NoIndex)
+    print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
     self.addCells(self._model._cells)
+    print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
+    #if self.bspTreeDepth() == 0:
+    #  self.setBspTreeDepth(6)
+    #  print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
   def addAxisLines(self):
     xaxis = QtGui.QGraphicsLineItem(-10,0,10,0)
     yaxis = QtGui.QGraphicsLineItem(0,-10,0,10)
@@ -99,11 +131,27 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     yaxis.setPen(p)
     self.addItem(xaxis)
     self.addItem(yaxis)
+  def CreateLayers(self, cells):
+    "For each layer, create a GraphicsLayerItem to serve as it's parent."
+    (low, high) = cells.GetBoundsVertical()
+    for i in range(low, high+1):
+      y = GraphicsLayerItem()
+      y.setZValue(i)
+      self.addItem(y)
+      self._layers[i] = y
+      y.setVisible(i == self._currentLayer)
+    print "{0} layers created".format(len(self._layers))
+  def FlipLayer(self, delta):
+    newLayer = self._currentLayer + delta
+    if newLayer in self._layers:
+      self._currentLayer = newLayer
+      for i in self._layers:
+        self._layers[i].setVisible(i == self._currentLayer)
   def addCells(self, cells):
     n = 13
     for v in cells.iterkeys():
-      h = GraphicsTileItem(cells[v], parent=None)
-      x, y, _v, _w = v.toRectCoords()
+      x, y, z, _w = v.toRectCoords()
+      h = GraphicsTileItem(cells[v], parent=self._layers[z])
       h.moveBy(x,-y)
       #u = abs(round(v.x))%2 + abs(round(v.y))%2 + abs(round(v.z))%2  # dotted
       #u = ( abs(round(v.x)) + abs(round(v.y)) + abs(round(v.z)) )%3   # concentric
@@ -112,7 +160,8 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
       #u = ( abs(round(v.x)) + abs(round(v.y)) )%3
       #h.setBrush(QtGui.QColor.fromHsv( (360.0*v.x/n)%360, (256.0*v.y/n)%256, (256.0*v.z/n)%256 ))
       #h.setBrush(QtGui.QColor.fromHsv( u*120, (256.0*v.y/n)%256, (256.0*v.z/n)%256 ))
-      self.addItem(h)
+      #self.addItem(h) # redundant with actually setting a parent
+      self._vexor2item.setdefault(v,[]).append(h)
 
       #if cells[v]._objects:
       #  # create player circle object
@@ -131,6 +180,8 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
         textItem.scale(ts,ts)
         textItem.moveBy(x-.25,-y-.1)
         self.addItem(textItem)
+    print "{0} GraphicsTileItems created".format(len(cells))
+
   def Model(self): return self._model
 
   def UpdateFromModel(self):
@@ -141,10 +192,16 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     changedCells = self._model.PopChanges()
     #print "UpdateFromModel(): changedCells =", changedCells
     for c in changedCells:
-      x,y, _v, _w = c.Pos().toRectCoords()
-      for i in self.items(QPointF(x,-y)):
+      #x,y, _z, _w = c.Pos().toRectCoords()
+      #itms = self.items(QPointF(x,-y), QtCore.Qt.IntersectsItemBoundingRect, QtCore.Qt.AscendingOrder)
+      #itms = [self.itemAt(x,-y)]
+      itms = self._vexor2item[c.Pos()]
+      #if len(itms) > 3:
+      #  print "{n} items at {x},{y}: {items}".format(n=len(itms),x=x,y=-y,items=itms)
+      for i in itms:   # this iterates all z depths
         #print i, i.boundingRect()
         #i.update()
+        i.UpdateRenderSpec()
         i.update(i.boundingRect())
     if not self._model._centerOn is None:
       for v in self.views():

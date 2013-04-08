@@ -97,6 +97,10 @@ class HexTileGraphicsView(QtGui.QGraphicsView):
       # TODO: get app/framewnd/simulation to process this right away
       #model.Scheduler().ExecEventsFor(model.Player().AnticipatedReadyDelay())
       self.model_event.emit(666)
+    elif k == QtCore.Qt.Key_PageUp:
+      self.scene().FlipLayer(1)
+    elif k == QtCore.Qt.Key_PageDown:
+      self.scene().FlipLayer(-1)
     elif k == QtCore.Qt.Key_BracketLeft or k == QtCore.Qt.Key_Slash:
       self.Rotate(-1)
     elif k == QtCore.Qt.Key_BracketRight or k == QtCore.Qt.Key_Asterisk:
