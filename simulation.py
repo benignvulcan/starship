@@ -541,9 +541,10 @@ class NPC(Character):
     return self._job is None
   def isInterestedInJob(self, j):
     if not self.Region() in [n._region for n in j.CellsToWorkFrom()]: return False
+    distanceToOfferedJob = self.MDistanceToJob(j)
+    if distanceToOfferedJob == 0: return False
     if not self._job: return True
     distanceToCurrentJob = self.MDistanceToJob(self._job)
-    distanceToOfferedJob = self.MDistanceToJob(j)
     return distanceToOfferedJob < distanceToCurrentJob
   def OfferJob(self, j):
     if DEBUG: print "Offering job {0} to NPC {1}".format(j, self)
@@ -803,18 +804,13 @@ class JobDispatcher(object):
     possibleMatches[None] = None
     
     for j in accessibleJobs:
-      possibleMatches[j] = self.FindCandidatesForJob(j,candidates)
-
-    if DEBUG: print "Possible Matches:", pprint.pprint(possibleMatches)
-#    possibleJobs = filter(lambda j: not j.claimants, accessibleJobs)
-#    if DEBUG: print "possible Jobs:", possibleJobs
-
-    for j in accessibleJobs:
       for c in j.claimants:
         c.AbandonJob()
       job = j
       while job:
         if DEBUG: print "Finding Match for job {0}".format(job)
+        if job not in possibleMatches:
+          possibleMatches[job] = self.FindCandidatesForJob(job, candidates)
         if not possibleMatches[job]: 
           break
         candidate = possibleMatches[job].pop()
