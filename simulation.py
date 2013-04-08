@@ -741,7 +741,7 @@ class JobDispatcher(object):
     self._workers = set()
     self._idleWorkers = set()
     self._process = self._simulation.Scheduler().CreateProcess(self.AssignJobs)
-    self._simulation.Scheduler().PostEvent(self._process, dt=10, recurring=True)
+    self._simulation.Scheduler().PostEvent(self._process, dt=3, recurring=True)
   def AddWorker(self, anNPC):
     self._workers.add(anNPC)
     self._idleWorkers.add(anNPC)
