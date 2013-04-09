@@ -222,11 +222,12 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     now = time.time()
     dt = now - self.perfClockStamp
     if dt > 0:
-      self.performanceStatus.setText("{0: >9} sim clock;  {1: >7.1f} events/sec;  {2: >5.1f} FPS;  {3: >2} jobs".format
+      self.performanceStatus.setText("{0: >9} sim clock;  {1: >7.1f} events/sec;  {2: >5.1f} FPS;  {3: >2} jobs;  {4: >2} idle workers".format
         ( self._simModel.Scheduler().Now()
         , (self.cyclecount-self.perfCycleStamp)/dt
         , (self.framecount-self.perfFrameStamp)/dt
         , self._simModel.JobCount()
+        , self._simModel.IdleWorkerCount()
         )
       )
     self.perfClockStamp = now

@@ -42,7 +42,7 @@ class Job(object):
     self.timestamp = timestamp
     self.claimants = []
   def __repr__(self):
-   return "<Job target=%s, obj=%s" % (self.target, self.obj)
+   return "<Job target=%s, obj=%s>" % (self.target, self.obj)
   def isSimilar(self, other):
     return type(self) == type(other) and self.target == other.target and self.obj == other.obj
   def Start(self, claimant):
@@ -52,8 +52,8 @@ class Job(object):
     self.amountToDo -= 1
   def Finish(self, claimant):
     pass
-  def CanWorkOnJobFrom(self):
-    pass
+  def CellsToWorkFrom(self):
+    return filter(lambda c: c.isTraversable(), self.target.ExistingNeighbors())
 class Construct(Job):
   def Finish(self, claimant):
     # target is a cell
@@ -64,9 +64,6 @@ class Construct(Job):
     self.target.Add(self.obj)
     self.target.Changed()
     super(Construct,self).Finish(claimant)
-  def CellsToWorkFrom(self):
-    adjacentCells = filter(lambda c: c.isTraversable(), self.target.ExistingNeighbors())
-    return adjacentCells
 class Unconstruct(Job):
   def Finish(self, claimant):
     self.target.Discard(DECK)
@@ -457,7 +454,7 @@ class Cell(SimObject):
     self._futureLook = []       # stuff to be built/installed/uninstalled ?
     self._region = None
   def __repr__(self):
-    return "<Cell pos={0}".format((self._pos))
+    return "<Cell pos={0}>".format((self._pos))
   def Pos(self): return self._pos
   def ExistingNeighbors(self):
     return self.TileMap().ExistingNeighbors(self._pos)
@@ -555,13 +552,16 @@ class NPC(Character):
       self.DrunkWalk()
   def isIdle(self):
     return self._job is None
-  def isInterestedInJob(self, j):
-    if not self.Region() in [n._region for n in j.CellsToWorkFrom()]: return False
+  def DisinterestInJob(self, j):
+    "Return a metric of how disinterested this NPC is in job j"
+    if not self.Region() in [n._region for n in j.CellsToWorkFrom()]:
+      return 1000
     distanceToOfferedJob = self.MDistanceToJob(j)
-    if distanceToOfferedJob == 0: return False
-    if not self._job: return True
-    distanceToCurrentJob = self.MDistanceToJob(self._job)
-    return distanceToOfferedJob < distanceToCurrentJob
+    if distanceToOfferedJob == 0:
+      return 100 
+    if self._job:
+      return distanceToOfferedJob * 4
+    return distanceToOfferedJob
   def OfferJob(self, j):
     if DEBUG: print "Offering job {0} to NPC {1}".format(j, self)
     if not self.isInterestedInJob(j):
@@ -589,6 +589,7 @@ class NPC(Character):
     self.Changed()
   def FinishJob(self):
     print "NPC: Finishing Job ", self._job
+    assert self in self._job.claimants
     self._job.Finish(self)
     self.Simulation().FinishJob(self._job)
     self._job = None  # done
@@ -759,7 +760,7 @@ class JobDispatcher(object):
     self._workers = set()
     self._idleWorkers = set()
     self._process = self._simulation.Scheduler().CreateProcess(self.AssignJobs)
-    self._simulation.Scheduler().PostEvent(self._process, dt=10, recurring=True)
+    self._simulation.Scheduler().PostEvent(self._process, dt=1, recurring=True)
   def AddWorker(self, anNPC):
     self._workers.add(anNPC)
     self._idleWorkers.add(anNPC)
@@ -780,61 +781,71 @@ class JobDispatcher(object):
     assert j in self._jobs
     assert not j.claimants
     j.claimants.append(claimant)
+    self._idleWorkers.remove(claimant)
   def UnclaimJob(self, claimant, j):
     if DEBUG: print "UnclaimJob", j, j.claimants, claimant
     assert j in self._jobs
     j.claimants.remove(claimant)
+    self._idleWorkers.add(claimant)
     if j.claimants: print "Remaining Claiminants:", j.claimants
   def GetUnclaimedJobs(self):
     return [j for j in self._jobs if len(j.claimants)==0]
   def FinishJob(self, j):
     print "FinishJob", j
+    for w in j.claimants:
+      self._idleWorkers.add(w)
     if j in self._jobs:
       self._jobs.remove(j)
     else:
-      print "  job %s not found" % j
+      print "  *** job {0} not found ***".format(j)
   def JobCount(self):
     return len(self._jobs)
+  def IdleWorkerCount(self):
+    return len(self._idleWorkers)
 
   def FindCandidatesForJob(self, j, candidates):
-    adjacentRegions = [n._region for n in j.target.ExistingNeighbors()]
+    adjacentRegions = set(n._region for n in j.target.ExistingNeighbors())
     candidatesInRegion = filter(lambda w: w.Parent()._region in adjacentRegions, candidates)
-    candidatesInRegion.sort(key=lambda w:w.MDistanceToJob(j))
-    candidatesInRegion.reverse()
-    return candidatesInRegion
+    disinterestCandidatePairs = map(lambda w: (w.DisinterestInJob(j), w), candidatesInRegion)
+    disinterestCandidatePairs.sort(reverse=True)
+    return disinterestCandidatePairs
 
   def AssignJobs(self, _):    
     "Match available jobs to available workers"
     print "Assigning jobs"
     #candidates = filter(lambda w: w.isIdle(), self._idleWorkers)
-    candidates = self._workers
+    candidates = self._idleWorkers
     print len(candidates)," Candidate Workers"
     if not candidates:
       return
-    accessibleJobs = filter(lambda j: j.target.isAccessible(), self._jobs)
-    print len(accessibleJobs), " Accessible Jobs"
+    accessibleJobs = filter(lambda j: not j.claimants and j.target.isAccessible(), self._jobs)
+    print len(accessibleJobs), " ready jobs"
     if not accessibleJobs:
       return
 
-    if DEBUG: print "Accessible Jobs:", accessibleJobs
+    #if DEBUG: print "Accessible Jobs:", accessibleJobs
 
-    possibleMatches = {}
+    possibleMatches = {}   # map from job to list of (disinterest, worker)
     possibleMatches[None] = None
-    
-    for j in accessibleJobs:
-      for c in j.claimants:
-        c.AbandonJob()
+    engagements = dict((w,(1001,None)) for w in candidates) # map from worker to (disinterest, tentative job)
+
+    for j in accessibleJobs[:30]:
       job = j
       while job:
-        if DEBUG: print "Finding Match for job {0}".format(job)
+        #if DEBUG: print "Finding Match for job {0}".format(job)
         if job not in possibleMatches:
           possibleMatches[job] = self.FindCandidatesForJob(job, candidates)
         if not possibleMatches[job]: 
           break
-        candidate = possibleMatches[job].pop()
-        job = candidate.OfferJob(job)
-        
-        
+        (disinterest, w) = possibleMatches[job].pop()
+        if disinterest < engagements[w][0]:
+          (engagements[w], job) = ((disinterest, job), engagements[w][1])
+
+    for w in engagements:
+      (disinterest, j) = engagements[w]
+      if not j is None:
+        if DEBUG: print "Assigning job {0}, interest {1}, to {2}".format(j, disinterest, w)
+        w.TakeJob(j)
 
 class Simulation(SimObject):
 
@@ -886,6 +897,8 @@ class Simulation(SimObject):
     self._dispatcher.FinishJob(j)
   def JobCount(self):
     return self._dispatcher.JobCount()
+  def IdleWorkerCount(self):
+    return self._dispatcher.IdleWorkerCount()
 
   def CreateWorld(self):
     HUB_RADIUS = 3**2
