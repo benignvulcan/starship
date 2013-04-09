@@ -588,10 +588,12 @@ class NPC(Character):
     self._job = None
     self.Changed()
   def FinishJob(self):
+    print "NPC: Finishing Job ", self._job
     self._job.Finish(self)
     self.Simulation().FinishJob(self._job)
     self._job = None  # done
     self.Changed()
+    print "NPC: Finishing Job ", self._job
   def JobWalk(self):
     if self._path is None:
       self._path = self.PathTo(self._job.target.Pos())
@@ -757,7 +759,7 @@ class JobDispatcher(object):
     self._workers = set()
     self._idleWorkers = set()
     self._process = self._simulation.Scheduler().CreateProcess(self.AssignJobs)
-    self._simulation.Scheduler().PostEvent(self._process, dt=3, recurring=True)
+    self._simulation.Scheduler().PostEvent(self._process, dt=10, recurring=True)
   def AddWorker(self, anNPC):
     self._workers.add(anNPC)
     self._idleWorkers.add(anNPC)
