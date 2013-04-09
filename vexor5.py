@@ -1,5 +1,5 @@
 
-import sys, math, collections, unittest
+import sys, math, numbers, collections, unittest
 
 _S = math.sqrt(3.0)/2.0 # + sys.float_info.epsilon does not really help
 _EPSILON = 10 ** (2 - sys.float_info.dig)  # experimentally determined number of digits
@@ -61,10 +61,32 @@ class Vexor(collections.namedtuple('VexorTuple','x y z v w')):
     return Vexor(self.x*scalar, self.y*scalar, self.z*scalar, self.v*scalar, self.w*scalar)
   def __rmul__(self, scalar):
     return Vexor(scalar*self.x, scalar*self.y, scalar*self.z, scalar*self.v, scalar*self.w)
-  def __div__(self, scalar):
+  def divFloat(self, scalar):
+    scalar = float(scalar)
     return Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar)
-  def __rdiv__(self, scalar):
-    return Vexor(scalar/self.x, scalar/self.y, scalar/self.z, scalar/self.v, scalar/self.w)
+  def divInt(self, scalar):
+    "Divide (using native coercions) and convert result to valid integer coordinates"
+    return Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar).vexorInt()
+  def divmodInt(self, scalar):
+    q = Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar).vexorInt()
+    return (q, self - (q * scalar))
+  def vexorInt(self, int=int):
+    "Truncate or round to nearest valid coordinate"
+    x = int(self.x)
+    y = int(self.y)
+    z = int(self.z)
+    s = x + y + z
+    if s:
+      dx = abs(x - self.x)
+      dy = abs(y - self.y)
+      dz = abs(z - self.z)
+      if dx >= dy and dx >= dz:
+        x -= s  # dx is max
+      elif dy >= dx and dy >= dz:
+        y -= s  # dy is max
+      else:
+        z -= s
+    return Vexor(x,y,z,int(self.v),int(self.w))
   def __neg__(self):
     return Vexor(-self.x, -self.y, -self.z, -self.v, -self.w)
   def __pos__(self):
@@ -222,7 +244,13 @@ class TestVexor(unittest.TestCase):
       self.assertEqual( 0 * n, ZERO )
       self.assertEqual( 1 * n, n )
       self.assertEqual( n * 1, n )
-      self.assertEqual( n / 1, n )
+      self.assertEqual( n.divFloat(1), n )
+      for d in (-3,-2,-1,1,2,3):
+        #print "{0} divFloat  {1} -> {2}".format(n, d, n.divFloat(d))
+        #print "{0} divInt    {1} -> {2}".format(n, d, n.divInt(d))
+        #print "{0} divmodInt {1} -> {2}".format(n, d, n.divmodInt(d))
+        self.assertTrue(n.divFloat(d).isValid())
+        self.assertTrue(n.divInt(d).isValid())
   def testSectorRange(self):
     self.assertEqual( [v for v in sectorRange(0      )], [] )
     self.assertEqual( [v for v in sectorRange(0,0    )], [] )
