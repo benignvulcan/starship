@@ -35,6 +35,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     self._simModel = simulation.Simulation(qparent=self)
 
     self._scene = scene.HexTileGraphicsScene(self._simModel)
+    self._selectionSet = set()
     self._scene.selectionChanged.connect(self.on__scene_selectionChanged)
 
     if False:
@@ -94,9 +95,10 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
 
   #@QtCore.pyqtSlot()
   def on__scene_selectionChanged(self):
-    print "selectionChanged"
-    selection = self._scene.selectedItems()
+    selection = set(self._scene.selectedItems())
     self.menuBuild.setEnabled(len(selection)>0)
+    print "selectionChanged {0}".format([i._cell.Pos() for i in selection - self._selectionSet])
+    self._selectionSet = selection
 
   @QtCore.pyqtSlot()
   def on_actionBuildDeck_triggered(self):

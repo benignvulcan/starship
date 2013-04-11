@@ -9,7 +9,7 @@ import math, random, heapq, unittest, pprint
 from vexor5 import *
 import scheduler
 
-DEBUG = False
+DEBUG = True
 
 def sign(n): return cmp(n,0)
 
@@ -57,6 +57,7 @@ class Job(object):
 class Construct(Job):
   def Finish(self, claimant):
     # target is a cell
+    print "Job.Finish()"
     self.target.Discard(DECK)
     self.target.Discard(BULKHEAD)
     if self in self.target._futureLook:
@@ -64,6 +65,7 @@ class Construct(Job):
     self.target.Add(self.obj)
     self.target.Changed()
     super(Construct,self).Finish(claimant)
+    print "Job.Finished"
 class Unconstruct(Job):
   def Finish(self, claimant):
     self.target.Discard(DECK)
@@ -228,6 +230,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
       self._regionSizeDict[self[pos]._region] += 1
       # and logically this could not have caused any merging or splitting,
       # so be done.
+      if DEBUG: print "UpdateCellRegion({0}) done: isolated cell".format(pos)
       return
     if len(similarRegions) > 1:  # Found multiple similar adjacent regions?
       self._MergeRegionsFrom(pos, similarRegions)
@@ -267,6 +270,7 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
           visited_regions.add(self[p2]._region)  # new region has been seen.
           #self._regionPt[self[p2]._region] = p2
       visited_regions.add(r1)
+    if DEBUG: print "UpdateCellRegion({0}) done".format(pos)
   def ComputeRegions(self):
     "(Re)assign region numbers to all cells.  Much faster when doing lots of updates."
     self._allocRegionNum = 0
@@ -470,7 +474,6 @@ class Cell(SimObject):
   def Discard(self, obj):
     if obj in self._objects:
       self.Remove(obj)
-      self.Changed()
   def ChangedTopology(self, what=None):
     self.ChangedPathing(what)
   def ChangedPathing(self, what=None):
@@ -479,8 +482,11 @@ class Cell(SimObject):
     self.Changed(self)
   def Changed(self, what=None):
     self._parent.Changed(self)
+    up_pos = self._pos+UP
+    if up_pos in self.TileMap():
+      self.TileMap()[up_pos].Changed(self)
   def isSupporter(self):
-    return BULKHEAD in self._objects
+    return len(self._objects) > 0
   def isSupported(self):
     if self._components.support:
       return True
@@ -594,7 +600,7 @@ class NPC(Character):
     self.Simulation().FinishJob(self._job)
     self._job = None  # done
     self.Changed()
-    print "NPC: Finishing Job ", self._job
+    print "NPC: Finished Job ", self._job
   def JobWalk(self):
     if self._path is None:
       self._path = self.PathTo(self._job.target.Pos())
@@ -791,13 +797,14 @@ class JobDispatcher(object):
   def GetUnclaimedJobs(self):
     return [j for j in self._jobs if len(j.claimants)==0]
   def FinishJob(self, j):
-    print "FinishJob", j
+    print "JobDispatcher.FinishJob({0})".format(j)
     for w in j.claimants:
       self._idleWorkers.add(w)
     if j in self._jobs:
       self._jobs.remove(j)
+      print "JobDispatcher.FinishJob done"
     else:
-      print "  *** job {0} not found ***".format(j)
+      print "*** job {0} not found ***".format(j)
   def JobCount(self):
     return len(self._jobs)
   def IdleWorkerCount(self):
