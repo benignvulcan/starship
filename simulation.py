@@ -6,12 +6,15 @@ import math, random, heapq, unittest, pprint
 #from PyQt4.QtCore import QPointF, QRectF
 #from PyQt4.QtGui  import QBrush, QColor, QPen, QPolygonF
 
-from vexor5 import *
+#from vexor5 import *
+from vexor5 import NEIGHBORS_4D, sectorRange, DOWN, ZERO, UP, NEIGHBORS_2D, Vexor
 import scheduler
+from action import Walk
+from job import Job
+from sim_object import SimObject, isTraversable, manhattanDistance, heapiter
 
-DEBUG = True
-
-def sign(n): return cmp(n,0)
+DEBUG = False
+def sign(n): return cmp(n, 0)
 
 CELL_BREADTH = 1  # meter
 CELL_APOTHEM = CELL_BREADTH / 2.0
@@ -20,108 +23,8 @@ NEIGHBORS = NEIGHBORS_4D
 
 #===============================================================================
 
-class Action(object):
-  def __init__(self):
-    super(Action,self).__init__()
-  def Preempts(self, other): return True
-class Walk(Action):
-  def __init__(self, degrees):
-    super(Walk,self).__init__()
-    self.degrees = degrees
-class GoTo(Action):
-  def __init__(self, there):
-    super(GoTo,self).__init__()
-    self.there = there
-
-class Job(object):
-  def __init__(self, target=None, obj=None, duration=10, timestamp=None):
-    super(Job,self).__init__()
-    self.target = target
-    self.obj = obj
-    self.amountToDo = duration
-    self.timestamp = timestamp
-    self.claimants = []
-  def __repr__(self):
-   return "<Job target=%s, obj=%s>" % (self.target, self.obj)
-  def isSimilar(self, other):
-    return type(self) == type(other) and self.target == other.target and self.obj == other.obj
-  def Start(self, claimant):
-    pass
-  def isDone(self): return self.amountToDo <= 0
-  def Work(self, claimant):
-    self.amountToDo -= 1
-  def Finish(self, claimant):
-    pass
-  def CellsToWorkFrom(self):
-    return filter(lambda c: c.isTraversable(), self.target.ExistingNeighbors())
-class Construct(Job):
-  def Finish(self, claimant):
-    # target is a cell
-    print "Job.Finish()"
-    self.target.Discard(DECK)
-    self.target.Discard(BULKHEAD)
-    if self in self.target._futureLook:
-      self.target._futureLook.remove(self)  # sometimes fails
-    self.target.Add(self.obj)
-    self.target.Changed()
-    super(Construct,self).Finish(claimant)
-    print "Job.Finished"
-class Unconstruct(Job):
-  def Finish(self, claimant):
-    self.target.Discard(DECK)
-    self.target.Discard(BULKHEAD)
-    if self in self.target._futureLook:
-      self.target._futureLook.remove(self)
-    self.target.Changed()
-    super(Unconstruct,self).Finish(claimant)
-
 #===============================================================================
 
-class SimObject(object):
-  def __init__(self, parent=None):
-    super(SimObject,self).__init__()
-    self._parent = parent       # Containing SimObject - often a Cell
-  def Parent(self): return self._parent
-  def SetParent(self, newParent):
-    if not self._parent is None:
-      self._parent.Remove(self)
-    if not newParent is None:
-      newParent.Add(self)
-    self._parent = newParent
-  def RegisterComponent(self, components):
-    "Install self to appropriate components."
-
-  def Simulation(self):
-    "Retrieve the top-level SimObject"
-    return self._parent.Simulation()
-  def Scheduler(self):
-    "Retrieve the nearest Scheduler."
-    return self._parent.Scheduler()
-  def TileMap(self):
-    return self._parent.TileMap()
-  def PathsTo(self, there):
-    return self.TileMap().PathsFromTo(self._parent.Pos(), there)
-  def PathTo(self, there):
-    return self.TileMap().PathFromTo(self._parent.Pos(), there)
-
-  def Changed(self, what=None):
-    "Propagate a change notice upwards."
-    if what is None: what = self
-    if not self._parent is None:
-      self._parent.Changed(what)
-
-  def SendResult(self, *posargs, **kwargs):
-    if not self._parent is None:
-      self._parent.SendResult(*posargs, **kwargs)
-    else: print "SimObject.SendResult() dropping on the floor"
-
-def isTraversable(c): return c.isTraversable()
-def manhattanDistance(a,b): return a.manhattanDistance(b)
-def heapiter(aHeap):
-  "Iterate a heapq (by destructively iterating a copy)."
-  h = aHeap[:]
-  while h:
-    yield heapq.heappop(h)
 
 class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
   def __init__(self, *posargs, **kwargs):
@@ -386,14 +289,14 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
           continue  # this route is no shorter, and pn has already been examined.
         pn_not_tovisit = all( pn != node for _, _, node in tovisit )
         if pn_not_tovisit or g < gscore[pn]:
-         # found a new node or shorter route to a visited node
-         came_from[pn] = current
-         gscore[pn] = g
-         fscore[pn] = g + cost_heuristic(pn, here)
-         if pn_not_tovisit:
-           # visit this node again in the future
-           # (even if already visited, because now we know a shorter route)
-           heapq.heappush(tovisit, (fscore[pn], random.randrange(rrng), pn) )
+          # found a new node or shorter route to a visited node
+          came_from[pn] = current
+          gscore[pn] = g
+          fscore[pn] = g + cost_heuristic(pn, here)
+          if pn_not_tovisit:
+            # visit this node again in the future
+            # (even if already visited, because now we know a shorter route)
+            heapq.heappush(tovisit, (fscore[pn], random.randrange(rrng), pn) )
     if DEBUG: print "no path from {0} to {1}".format(here, there)
     return None
 
@@ -928,12 +831,12 @@ class Simulation(SimObject):
     # Create ring(s)
     for r in range(-2, 3): # for thickness of ring
       for v in sectorRange(RING_RADIUS+r,RING_RADIUS+r+1):
-          self._cells[v+DOWN].Add(BULKHEAD)
+        self._cells[v+DOWN].Add(BULKHEAD)
       for v in sectorRange(RING2_RADIUS+r,RING2_RADIUS+r+1):
-          self._cells[v+DOWN].Add(BULKHEAD)
+        self._cells[v+DOWN].Add(BULKHEAD)
     # Create hubs
     for v in sectorRange(HUB_RADIUS):  # create (bottom) center hub first
-        self._cells[DOWN+v].Add(BULKHEAD)
+      self._cells[DOWN+v].Add(BULKHEAD)
     for n in NEIGHBORS_2D:
       hub = n*RING_RADIUS + DOWN
       for v in sectorRange(HUB_RADIUS):

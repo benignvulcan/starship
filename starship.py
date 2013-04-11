@@ -13,7 +13,8 @@ from PyQt4 import QtCore, QtGui, uic
 #from PyQt4 import QtOpenGL
 from PyQt4.QtGui  import QBrush, QColor, QPen
 
-import scene, simulation
+import scene, simulation, action, job, sim_object
+
 
 if True:
   from starshipMainWindow_ui import Ui_StarshipMainWindow
@@ -105,7 +106,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     print "actionBuildDeck"
     for gtile in self._scene.selectedItems():
       if not simulation.DECK in gtile._cell._objects:
-        j = simulation.Construct(gtile._cell, simulation.DECK, timestamp=self._simModel.Now())
+        j = job.Construct(gtile._cell, simulation.DECK, timestamp=self._simModel.Now())
         self._simModel.PostJob(j)
       else: print "%s already contains deck" % (gtile._cell.Pos(),)
     self.frameUpdate()
@@ -125,7 +126,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     print "actionBuildBulkhead"
     for gtile in self._scene.selectedItems():
       if not simulation.BULKHEAD in gtile._cell._objects:
-        self._simModel.PostJob( simulation.Construct(gtile._cell, simulation.BULKHEAD) )
+        self._simModel.PostJob( job.Construct(gtile._cell, simulation.BULKHEAD) )
       else: print "%s already contains bulkhead" % (gtile._cell.Pos(),)
     self.frameUpdate()
 
@@ -144,7 +145,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     print "actionUnbuild"
     for gtile in self._scene.selectedItems():
       if simulation.BULKHEAD in gtile._cell._objects or simulation.DECK in gtile._cell._objects:
-        self._simModel.PostJob( simulation.Unconstruct(gtile._cell) )
+        self._simModel.PostJob( job.Unconstruct(gtile._cell) )
       else: print "%s is already empty" % (gtile._cell.Pos(),)
     self.frameUpdate()
 
@@ -159,7 +160,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     elif k == QtCore.Qt.Key_G:
       selectedTiles = self._scene.selectedItems()
       if len(selectedTiles):
-        self._simModel.Player().PostInput(simulation.GoTo([t._cell.Pos() for t in selectedTiles]))
+        self._simModel.Player().PostInput(action.GoTo([t._cell.Pos() for t in selectedTiles]))
         self.ExecSimCmd()
     else:
       print "StarshipMainWindow.keyPressEvent(%08x)" % k
