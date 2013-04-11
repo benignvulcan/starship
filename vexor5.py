@@ -256,6 +256,8 @@ class TestVexor(unittest.TestCase):
         #print "{0} divmodInt {1} -> {2}".format(n, d, n.divmodInt(d))
         self.assertTrue(n.divFloat(d).isValid())
         self.assertTrue(n.divInt(d).isValid())
+        q,r = n.divmodInt(d)
+        self.assertEqual(n, q*d+r)
   def testSectorRange(self):
     self.assertEqual( [v for v in sectorRange(0      )], [] )
     self.assertEqual( [v for v in sectorRange(0,0    )], [] )
@@ -273,6 +275,12 @@ class TestVexor(unittest.TestCase):
     self.assertEqual( [v for v in sectorRange(2,-1,-1)], list(_R2_2D)+list(NEIGHBORS_2D)+[ZERO] )
     self.assertEqual( [v for v in sectorRange(1,2,1,1,5)], list(NEIGHBORS_2D)[1:5] )
     self.assertEqual( [v for v in sectorRange(1,2,1,3,0,-1)], list(reversed(NEIGHBORS_2D[1:4])) )
+    for n in sectorRange(10):
+      for d in (-3,-2,-1,1,2,3):
+        self.assertTrue(n.divFloat(d).isValid())
+        self.assertTrue(n.divInt(d).isValid())
+        q,r = n.divmodInt(d)
+        self.assertEqual(n, q*d+r)
 
 if __name__=='__main__': unittest.main()
 
