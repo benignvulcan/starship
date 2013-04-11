@@ -15,12 +15,15 @@ textures2hsv = \
   , simulation.Textures.BULKHEAD  : (240,  15,  63)
   , simulation.Textures.DECK      : (200,  15, 191)
   }
+sevenHueMap = [0,30,60,120,180,240,300]
+
 def Texture2HSV(tx, pos):
   'Given a texture and a vexor position, return a color.'
   h,s,v = textures2hsv[tx]
   if tx in (simulation.Textures.BULKHEAD, simulation.Textures.DECK):
-    tupity = vexor5.uniform1coloring(pos)
-    h,s,v = (h, s, v + tupity*16 )
+    tupity = vexor5.uniform3coloring(pos)
+    #h,s,v = (h, s, v + tupity*16 )
+    h,s,v = (sevenHueMap[tupity], s*3, v)
   return (h,s,v)
 
 #class GraphicsLayerItem(QtGui.QGraphicsItemGroup):
@@ -61,6 +64,9 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
     self._renderSpec = self._cell.GetRenderSpec()
 
   def paint(self, painter, option, widget=0):
+    #pixm = QPixMap(svgr.defaultSize())
+    #painter = QPainter(pixm)
+    #svgr.render(painter)
     painter.setClipPath(self.hexagon_qpainterpath)
     painter.setPen(QtCore.Qt.NoPen)
     for (renderObj, arg) in self._renderSpec:
@@ -89,7 +95,8 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
       scale = .02
       painter.scale(scale,scale)
       r = QtCore.QRectF(-.5/scale,-.5/scale,1/scale,1/scale)
-      txt = "{0},{1},{2}".format(self._cell.Pos().x, self._cell.Pos().y, self._cell.Pos().z)
+      #txt = "{0},{1},{2}".format(self._cell.Pos().x, self._cell.Pos().y, self._cell.Pos().z)
+      txt = "{0}".format( vexor5.uniform3coloring(self._cell.Pos()) )
       #txt = str(self._cell._region)
       painter.drawText(r, QtCore.Qt.AlignCenter, txt)
 

@@ -64,12 +64,12 @@ class Vexor(collections.namedtuple('VexorTuple','x y z v w')):
   def divFloat(self, scalar):
     scalar = float(scalar)
     return Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar)
-  def divInt(self, scalar):
+  def divInt(self, scalar, int=int):
     "Divide (using native coercions) and convert result to valid integer coordinates"
-    return Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar).vexorInt()
-  def divmodInt(self, scalar):
-    q = Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar).vexorInt()
-    return (q, self - (q * scalar))
+    return Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar).vexorInt(int=int)
+  def divmodInt(self, scalar, int=int):
+    q = Vexor(self.x/scalar, self.y/scalar, self.z/scalar, self.v/scalar, self.w/scalar).vexorInt(int=int)
+    return (q, self - (q * int(scalar)))
   def vexorInt(self, int=int):
     "Truncate or round to nearest valid coordinate"
     x = int(self.x)
@@ -161,6 +161,11 @@ def uniform2coloring(v):
   '"2-uniform" 4-coloring for hexagonal tiling.'
   x,y = v.toSkewXY()
   return ((x&1)<<1) | (y&1)
+
+def uniform3coloring(v):
+  '"3-uniform" 7-coloring for hexagonal tiling.'
+  x,y = v.toSkewXY()
+  return (x+3*y)%7
 
 ZERO = Vexor(0,0,0, 0,0)
 
