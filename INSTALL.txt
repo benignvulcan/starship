@@ -5,10 +5,11 @@ Requirements:
     benignvulcan is currently developing this game on a four year old
       2.4 GHz Core2 Duo P9400 with 4 GB RAM
       under Ubuntu 10.04 32-bit
-  Python 2.7
+  Python 2.6 or 2.7
   Qt libraries, versions 4.6, 4.7, or 4.8
     It might work just fine with Qt 5 when PyQt5 becomes available.
   PyQt4 libraries + pyuic4
+    Must match your version of Python
   Build environment is currently minimal, but does assume a *NIX environment,
     notably 'make'.
   Development is using `git` version management software.
