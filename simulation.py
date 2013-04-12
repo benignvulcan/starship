@@ -389,9 +389,9 @@ class Cell(SimObject):
     if up_pos in self.TileMap():
       self.TileMap()[up_pos].Changed(self)
   def isSupporter(self):
-    return len(self._objects) > 0
+    return BULKHEAD in self._objects
   def isSupported(self):
-    if self._components.support:
+    if self._components.support or DECK in self._objects:
       return True
     dn_pos = self._pos+DOWN
     return dn_pos in self.TileMap() and self.TileMap()[dn_pos].isSupporter()
