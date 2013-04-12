@@ -7,11 +7,14 @@ import math, random, heapq, unittest, pprint
 #from PyQt4.QtGui  import QBrush, QColor, QPen, QPolygonF
 
 #from vexor5 import *
-from vexor5 import NEIGHBORS_4D, sectorRange, DOWN, ZERO, UP, NEIGHBORS_2D, Vexor
+#from vexor5 import NEIGHBORS_4D, sectorRange, DOWN, ZERO, UP,NEIGHBORS_2D, Vexor
+import vexor5
 import scheduler
-from action import Walk
-from job import Job
-from sim_object import SimObject, isTraversable, manhattanDistance, heapiter
+import action
+import sim_object
+#from action import Walk
+#from job import Job
+#from sim_object import SimObject, isTraversable, manhattanDistance, heapiter
 
 DEBUG = False
 def sign(n): return cmp(n, 0)
@@ -19,14 +22,14 @@ def sign(n): return cmp(n, 0)
 CELL_BREADTH = 1  # meter
 CELL_APOTHEM = CELL_BREADTH / 2.0
 
-NEIGHBORS = NEIGHBORS_4D
+NEIGHBORS = vexor5.NEIGHBORS_4D
 
 #===============================================================================
 
 #===============================================================================
 
 
-class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
+class HexArrayModel(sim_object.SimObject, dict):  # like a QAbstractItemModel
   def __init__(self, *posargs, **kwargs):
     super(HexArrayModel, self).__init__(*posargs, **kwargs)
     self._pathsCache = {}  # map from (set of traversable dest Vexor) to (list of sets of cells of distance r)
@@ -201,10 +204,10 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
   def FlushPathsCache(self):
     if DEBUG and self._pathsCache: print "flushing path cache"
     self._pathsCache = {}
-  def PathsFromTo(self, here, there, isPathable=isTraversable):
+  def PathsFromTo(self, here, there, isPathable=sim_object.isTraversable):
     "Given a destination cell position (or set of them), return a set of adjacent closer positions, or None."
-    assert isinstance(here, Vexor)
-    if isinstance(there, Vexor):
+    assert isinstance(here, vexor5.Vexor)
+    if isinstance(there, vexor5.Vexor):
       there = frozenset([there])
     if (not there) or (here in there): return None   # can't get any closer!
     tilemap = self.TileMap()
@@ -234,8 +237,8 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
       r += 1
     if DEBUG: print "path cache hit, %d tiles" % hits
     return [here + n for n in NEIGHBORS if here + n in distances[r-1]]     # return set of closer positions
-  def PathFromTo(self, here, there, isPathable = isTraversable
-                                  , cost_heuristic = manhattanDistance
+  def PathFromTo(self, here, there, isPathable = sim_object.isTraversable
+                                  , cost_heuristic = sim_object.manhattanDistance
                                   , randomize = True):
     '''Given one or more destination cell positions, return a shortest path.
     Returns a list of positions starting with an adjacent cell and ending with a destination cell.
@@ -246,8 +249,8 @@ class HexArrayModel(SimObject, dict):  # like a QAbstractItemModel
       destination is often desirable or sufficient.
     '''
     # See http://en.wikipedia.org/wiki/A*_search_algorithm
-    assert isinstance(here, Vexor)
-    if isinstance(there, Vexor):
+    assert isinstance(here, vexor5.Vexor)
+    if isinstance(there, vexor5.Vexor):
       there = frozenset([there])
     if not there: return None
     if here in there: return []   # can't get any closer!
@@ -308,7 +311,7 @@ class EnumerateConstants(object):
 Textures = EnumerateConstants("VOID DECK BULKHEAD")
 RenderObjects = EnumerateConstants("BG TARGETING PLAYER NPC")
 
-class Deck(SimObject):
+class Deck(sim_object.SimObject):
   def __repr__(self):
     return "DECK"
   def RegisterComponent(self, components):
@@ -316,7 +319,7 @@ class Deck(SimObject):
     components.support = self
     components.ChangedTopology(self)
 DECK = Deck()  # Deck singleton
-class Bulkhead(SimObject):
+class Bulkhead(sim_object.SimObject):
   def __repr__(self):
     return "BULKHEAD"
   def RegisterComponent(self, components):
@@ -326,7 +329,7 @@ class Bulkhead(SimObject):
     components.ChangedTopology(self)
 BULKHEAD = Bulkhead() # Bulkhead singleton
 
-class Cell(SimObject):
+class Cell(sim_object.SimObject):
   class Components(object):
     def __init__(self, parent):
       self.parent = parent
@@ -385,7 +388,7 @@ class Cell(SimObject):
     self.Changed(self)
   def Changed(self, what=None):
     self._parent.Changed(self)
-    up_pos = self._pos+UP
+    up_pos = self._pos+vexor5.UP
     if up_pos in self.TileMap():
       self.TileMap()[up_pos].Changed(self)
   def isSupporter(self):
@@ -393,7 +396,7 @@ class Cell(SimObject):
   def isSupported(self):
     if self._components.support or DECK in self._objects:
       return True
-    dn_pos = self._pos+DOWN
+    dn_pos = self._pos+vexor5.DOWN
     return dn_pos in self.TileMap() and self.TileMap()[dn_pos].isSupporter()
   def isTraversable(self):
     return len(self._components.obstructions)==0 and self.isSupported()
@@ -434,7 +437,7 @@ class Cell(SimObject):
       if isinstance(o, klass): return True
     return False
 
-class Character(SimObject):
+class Character(sim_object.SimObject):
   def Region(self): return self.Cell()._region
   def Cell(self): return self._parent
   def MoveTo(self, dest):
@@ -605,9 +608,9 @@ class Player(Character):
       self._goalCmd = self._userCmdQueue.pop(0)
     # Methods should set _userCmdReadyTimeDelta if they want a different busy time.
     # Methods should set _goalCmd to None when the goal is to be discarded.
-    if isinstance(self._goalCmd, Walk):
+    if isinstance(self._goalCmd, action.Walk):
       self.Walk()
-    elif isinstance(self._goalCmd, GoTo):
+    elif isinstance(self._goalCmd, action.GoTo):
       self.GoTo()
     else:
       print "  User Cmd ignored:", self._goalCmd
@@ -757,7 +760,7 @@ class JobDispatcher(object):
         if DEBUG: print "Assigning job {0}, interest {1}, to {2}".format(j, disinterest, w)
         w.TakeJob(j)
 
-class Simulation(SimObject):
+class Simulation(sim_object.SimObject):
 
   def __init__(self, qparent):
     super(Simulation,self).__init__()
@@ -815,8 +818,8 @@ class Simulation(SimObject):
     RING_RADIUS = 3**3
     RING2_RADIUS = RING_RADIUS * 2
     # Create cells
-    for u in sectorRange(RING2_RADIUS+HUB_RADIUS+1):
-      for v in (DOWN,ZERO,UP):
+    for u in vexor5.sectorRange(RING2_RADIUS+HUB_RADIUS+1):
+      for v in (vexor5.DOWN,vexor5.ZERO,vexor5.UP):
         uv = u+v
         self._cells[uv] = Cell(self._cells, uv)
         self._cells.UpdateCellRegion(uv)
@@ -825,31 +828,31 @@ class Simulation(SimObject):
     for sextant in range(6):
       for r in range(HUB_RADIUS-2,RING2_RADIUS-2):
         for w in range(-2,3):
-          v = NEIGHBORS_2D[sextant]*r + NEIGHBORS_2D[(sextant+2)%6]*w + DOWN
+          v = vexor5.NEIGHBORS_2D[sextant]*r + vexor5.NEIGHBORS_2D[(sextant+2)%6]*w + vexor5.DOWN
           #self._cells[v].Add(DECK)
           self._cells[v].Add(BULKHEAD)
     # Create ring(s)
     for r in range(-2, 3): # for thickness of ring
-      for v in sectorRange(RING_RADIUS+r,RING_RADIUS+r+1):
-        self._cells[v+DOWN].Add(BULKHEAD)
-      for v in sectorRange(RING2_RADIUS+r,RING2_RADIUS+r+1):
-        self._cells[v+DOWN].Add(BULKHEAD)
+      for v in vexor5.sectorRange(RING_RADIUS+r,RING_RADIUS+r+1):
+        self._cells[v+vexor5.DOWN].Add(BULKHEAD)
+      for v in vexor5.sectorRange(RING2_RADIUS+r,RING2_RADIUS+r+1):
+        self._cells[v+vexor5.DOWN].Add(BULKHEAD)
     # Create hubs
-    for v in sectorRange(HUB_RADIUS):  # create (bottom) center hub first
-      self._cells[DOWN+v].Add(BULKHEAD)
-    for n in NEIGHBORS_2D:
-      hub = n*RING_RADIUS + DOWN
-      for v in sectorRange(HUB_RADIUS):
+    for v in vexor5.sectorRange(HUB_RADIUS):  # create (bottom) center hub first
+      self._cells[vexor5.DOWN+v].Add(BULKHEAD)
+    for n in vexor5.NEIGHBORS_2D:
+      hub = n*RING_RADIUS + vexor5.DOWN
+      for v in vexor5.sectorRange(HUB_RADIUS):
         self._cells[hub+v].Add(BULKHEAD)
-      hub = n*RING2_RADIUS + DOWN
-      for v in sectorRange(HUB_RADIUS):
+      hub = n*RING2_RADIUS + vexor5.DOWN
+      for v in vexor5.sectorRange(HUB_RADIUS):
         self._cells[hub+v].Add(BULKHEAD)
     # Find edges
     edges = set()
     for v in self._cells.keys():
       if not self._cells[v].isSupported():                # is there a DECK here?
         continue                                          # no, skip it
-      for v2 in self._cells.ExistingNeighborPositionsOf(v, neighborVexors=NEIGHBORS_2D):
+      for v2 in self._cells.ExistingNeighborPositionsOf(v, neighborVexors=vexor5.NEIGHBORS_2D):
         if not self._cells[v2].isSupported():             # is there a DECK adjacent?
           edges.add(v)                                    # no, so v is an edge.
           break

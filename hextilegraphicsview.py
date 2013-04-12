@@ -4,7 +4,8 @@
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import QPointF, QRectF
 #from PyQt4.QtGui  import QBrush, QColor, QPen, QPolygonF
-import simulation
+#import simulation
+import action
 
 class HexTileGraphicsView(QtGui.QGraphicsView):
   '''
@@ -91,7 +92,7 @@ class HexTileGraphicsView(QtGui.QGraphicsView):
       elif self._depressedOctants == set([6,0]):
         o = 7
       model = self.scene().Model()
-      model.Player().PostInput(simulation.Walk(self._duodecimants*30 + o*45))
+      model.Player().PostInput(action.Walk(self._duodecimants*30 + o*45))
       #self.CenterOnCell( self.scene().Model().Player().Parent() )
       #self.scene().update()
       #self.scene().UpdateFromModel()
