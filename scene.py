@@ -49,7 +49,8 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
   def __init__(self, cell, parent):
     QtGui.QGraphicsPolygonItem.__init__(self, self.hexagon_qpolyf, parent)
     self._cell = cell
-    self._renderSpec = []   # a list of instructions on how to render this cell
+    self._renderSpec = ()   # a list of instructions on how to render this cell
+    self._renderCache = {}  # map from (renderSpec,level_of_detail) to QPixMap
     self.setFlags( self.flags()
                  | QtGui.QGraphicsItem.ItemIsSelectable
                  | QtGui.QGraphicsItem.ItemIsFocusable
@@ -61,20 +62,26 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
     self.UpdateRenderSpec()
 
   def UpdateRenderSpec(self):
-    self._renderSpec = self._cell.GetRenderSpec()
+    self._renderSpec = tuple(self._cell.GetRenderSpec())
 
   def paint(self, painter, option, widget=0):
-    #pixm = QPixMap(svgr.defaultSize())
-    #painter = QPainter(pixm)
-    #svgr.render(painter)
-    painter.setClipPath(self.hexagon_qpainterpath)
+    lod = option.levelOfDetailFromTransform(painter.worldTransform())
+    #print lod
+    #key = (self._renderSpec, lod)
+    #if key in self._renderCache:
+    #  bitBlt
+    #else:
+    #  pixm = QPixMap(svgr.defaultSize())
+    #  painter = QPainter(pixm)
+    if lod >= 23:
+      painter.setClipPath(self.hexagon_qpainterpath)
     painter.setPen(QtCore.Qt.NoPen)
     for (renderObj, arg) in self._renderSpec:
       if renderObj == simulation.RenderObjects.BG:
         painter.setBrush(QBrush(QtGui.QColor.fromHsv(*Texture2HSV(arg, self._cell.Pos()))))
         if self.isSelected():
           painter.setPen(self.selectionPen)
-        else:
+        elif lod >= 23:
           painter.setPen(self.pen())
         painter.drawConvexPolygon(self.polygon())
         painter.setPen(QtCore.Qt.NoPen)

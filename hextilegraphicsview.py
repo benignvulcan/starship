@@ -24,6 +24,7 @@ class HexTileGraphicsView(QtGui.QGraphicsView):
     self._depressedOctants = set()
     #self.setViewportUpdateMode(QtGui.QGraphicsView.NoViewportUpdate)
     print "HexTileGraphicsView.viewportUpdateMode =", self.viewportUpdateMode()
+    #self.translate(0.5,0.5)
     self.Zoom(32)
     #self.centerOn(0,0
   def Rotate(self, duodecimant):
