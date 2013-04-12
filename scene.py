@@ -38,6 +38,7 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
   hexagon_qpolyf = None
   hexagon_qpainterpath = None
   selection_pen = None
+  _oldLOD = None
 
   @classmethod
   def InitClassVariables(cls):
@@ -54,9 +55,13 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
     self.setFlags( self.flags()
                  | QtGui.QGraphicsItem.ItemIsSelectable
                  | QtGui.QGraphicsItem.ItemIsFocusable
+                #| QtGui.QGraphicsItem.ItemIgnoresTransformations
                 #| QtGui.QGraphicsItem.ItemClipsToShape
                 #| QtGui.QGraphicsItem.ItemIsMovable
                  )
+    # speeds window sizing and repainting, but not zooming or rotating
+    self.setCacheMode(QtGui.QGraphicsItem.DeviceCoordinateCache)
+    #self.setCacheMode(QtGui.QGraphicsItem.ItemCoordinateCache)   # looks hideous, but it is even faster
     self.setPen(QtGui.QPen(QtGui.QColor(31,31,31), .05))
     self.setBrush(QtCore.Qt.yellow)
     self.UpdateRenderSpec()
@@ -65,9 +70,21 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
     self._renderSpec = tuple(self._cell.GetRenderSpec())
 
   def paint(self, painter, option, widget=0):
+    # TODO: For a given zoom level and rotation and cell contents,
+    # cache tile rendering in a bitmap.  Since many tiles are often identical
+    # this should provide a substatial speedup.
+    # TODO: Strategy: Using the given painter's transformation,
+    # extract size and orientation, then reset the transform and
+    # either blit from cache or manually scale and rotate painting into
+    # a QPixMap, and then blit it.
+    # TODO: Extend the above technique so that in the same way, alpha-masked
+    # pixmaps of the various component drawing operations are cached.
     lod = option.levelOfDetailFromTransform(painter.worldTransform())
-    #print lod
-    #key = (self._renderSpec, lod)
+    if lod != GraphicsTileItem._oldLOD:
+      GraphicsTileItem._oldLOD = lod
+      print "GraphicsTileItem level of detail = {0}".format(lod)
+    #painter.resetTransform()  # restore to device coordinates, 1 = 1 pixel
+    #key = (self._renderSpec, lod, orientation)
     #if key in self._renderCache:
     #  bitBlt
     #else:
