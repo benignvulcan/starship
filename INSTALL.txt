@@ -1,0 +1,7 @@
+Super-Terse Compiling/Installing Instructions
+
+Under Debian/Ubuntu systems:
+  apt-get install python-qt4 pyqt4-dev-tools git
+  git checkout https://github.com/benignvulcan/starship
+  cd starship; ./run    # builds _ui.py files and executes app
+
