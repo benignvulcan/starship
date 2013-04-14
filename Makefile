@@ -5,6 +5,9 @@ PYTHON=python
 
 all: starshipMainWindow_ui.py unittest
 
+lint: *.py
+	pylint --rcfile=pylintrc *.py
+
 .PHONY: unittest clean
 
 # Implicit/Pattern rule for compiling .ui files to Python
