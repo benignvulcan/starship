@@ -1,4 +1,9 @@
+import random, heapq
 import sim_object
+import vexor5
+
+DEBUG = False
+NEIGHBORS = vexor5.NEIGHBORS_4D
 
 class HexArrayModel(sim_object.SimObject, dict):  # like a QAbstractItemModel
   def __init__(self, *posargs, **kwargs):
