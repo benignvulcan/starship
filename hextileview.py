@@ -9,13 +9,20 @@ import qtmath, vexor5
 def Hexagon(aRect, duodectant=0, antialiasing=False):
   "Return a hexagonal QPolygon fitting a rectangle."
   # Note that QRects are inherently oriented to a +y=down coordinate system
+  xc = aRect.center().x()
+  yc = aRect.center().y()
   if duodectant % 2:
     # points up and down, flats to the sides
-    return QtGui.QPolygon()
+    yq = round(aRect.height() / 4.0)
+    pts = [ QPoint(aRect.right(), yc-yq)
+          , QPoint(xc, aRect.top())
+          , QPoint(aRect.left(), yc-yq)
+          , QPoint(aRect.left(), yc+yq)
+          , QPoint(xc, aRect.bottom())
+          , QPoint(aRect.right(), yc+yq)
+          ]
   else:
     # points left and right, flats top and bottom
-    xc = aRect.center().x()
-    yc = aRect.center().y()
     xq = round(aRect.width() / 4.0)
     pts = [ QPoint(aRect.right(), yc)
           , QPoint(xc+xq, aRect.top())
@@ -24,11 +31,11 @@ def Hexagon(aRect, duodectant=0, antialiasing=False):
           , QPoint(xc-xq, aRect.bottom())
           , QPoint(xc+xq, aRect.bottom())
           ]
-    print "right={0},top={1},left={2},bottom={3}".format(aRect.right(), aRect.top(), aRect.left(), aRect.bottom())
-    print "pts =", pts
-    if antialiasing:
-      return QtGui.QPolygonF(map(lambda p: QPointF(p)+QPointF(0.5,0.5), pts))
-    return QtGui.QPolygon(pts)
+  print "right={0},top={1},left={2},bottom={3}".format(aRect.right(), aRect.top(), aRect.left(), aRect.bottom())
+  print "pts =", pts
+  if antialiasing:
+    return QtGui.QPolygonF(map(lambda p: QPointF(p)+QPointF(0.5,0.5), pts))
+  return QtGui.QPolygon(pts)
 
 class Tile(object):
   def __init__(self):
