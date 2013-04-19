@@ -14,6 +14,7 @@ from PyQt4 import QtCore, QtGui, uic
 from PyQt4.QtGui  import QBrush, QColor, QPen
 
 import scene, simulation, action, job, sim_object
+import hextileview
 
 
 if True:
@@ -56,6 +57,10 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     # It's at least one order of magnitude faster.
     # See "-graphicssystem" option, and QApplication::setGraphicsSystem()
     #self.hexView.setViewport(QtOpenGL.QGLWidget())
+
+    self.hexView2 = hextileview.HexTileView(self.centralwidget)
+    self.horizontalLayout.addWidget(self.hexView2)
+    self.horizontalLayout.removeWidget(self.hexView)
 
     #self.simRateLimit.setValue(10000)
     self.simRateLimit.valueChanged.connect(self.on_action_simRateLimit_valueChanged)

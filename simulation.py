@@ -543,7 +543,7 @@ class Simulation(sim_object.SimObject):
 
   def CreateWorld(self):
     HUB_RADIUS = 3**2
-    RING_RADIUS = 3**3
+    RING_RADIUS = 3**2
     RING2_RADIUS = RING_RADIUS * 2
     # Create cells
     for u in vexor5.sectorRange(RING2_RADIUS+HUB_RADIUS+1):
