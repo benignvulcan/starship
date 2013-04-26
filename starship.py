@@ -58,7 +58,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     # See "-graphicssystem" option, and QApplication::setGraphicsSystem()
     #self.hexView.setViewport(QtOpenGL.QGLWidget())
 
-    self.hexView2 = hextileview.HexTileView(self.centralwidget)
+    self.hexView2 = hextileview.HexTileView(self.centralwidget, self._simModel)
     self.horizontalLayout.addWidget(self.hexView2)
     self.horizontalLayout.removeWidget(self.hexView)
 

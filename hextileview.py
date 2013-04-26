@@ -38,8 +38,9 @@ def Hexagon(aRect, duodectant=0, antialiasing=False):
   return QtGui.QPolygon(pts)
 
 class Tile(object):
-  def __init__(self):
+  def __init__(self, vexorPos):
     super(Tile, self).__init__()
+    self._vexorPos = vexorPos
     self._bgcolor = QtCore.Qt.black
     self._pen = QtGui.QPen(QtCore.Qt.red)
     self._pen.setWidth(1)
@@ -55,25 +56,28 @@ class Tile(object):
     #hexagon = qtmath.RegularPolygon(n=6, apothem=a, rotate=-math.pi/2)
     hexagon = Hexagon(aRect, antialiasing=antialiasing)
     painter.drawConvexPolygon(hexagon)
-    #r = 8
-    #painter.setBrush(QtGui.QBrush(QtCore.Qt.blue))
-    #painter.drawEllipse(QPointF(a,a), r, r)
+    r = 8
+    painter.setBrush(QtGui.QBrush(QtCore.Qt.blue))
+    painter.drawEllipse(aRect.center(), r, r)
 
 class HexTileView(QtGui.QWidget):
-  def __init__(self, parent):
+  def __init__(self, parent, theSimulation):
     QtGui.QWidget.__init__(self, parent)
-    height = 32
+    self._simulation = theSimulation
+    self._tiles = {}   # map from Vexor to Tile
+    self._SetTileSize(32)
+    self.AddCells(self._simulation._cells)
+  def AddCells(self, cells):
+    for vex in cells.iterkeys():
+      t = Tile(cells[vex])
+      self._tiles[vex] = t
+  def _SetTileSize(self, height):
     self._tileSize = (int(round(height*2/math.sqrt(3))), height)
     print "tileSize = {0}".format(self._tileSize)
-  def HexBitmap(self, antialiasing=False):
-    sz = QtCore.QSize(*self._tileSize)
-    bm = QtGui.QBitmap(sz)
-    bm.clear()
-    bmPainter = QtGui.QPainter(bm)
-    bmPainter.setPen(QtCore.Qt.NoPen)
-    bmPainter.setBrush(QtGui.QBrush(QtCore.Qt.color1))
-    bmPainter.drawConvexPolygon(Hexagon(self._tileSize[0], self._tileSize[1], antialiasing=antialiasing))
-    return bm
+  def Vexor2PixelCoords(self, v):
+    x = self._tileSize[0] * v.x
+    y = self._tileSize[1] * (v.y - v.z)/2.0
+    return (x,y)
   def paintEvent(self, evt):
     widgetPainter = QtGui.QPainter(self)
     widgetPainter.setWindow(-self.width()/2, -self.height()/2, self.width(), self.height())
@@ -81,34 +85,36 @@ class HexTileView(QtGui.QWidget):
     #widgetPainter.setWindow(-self.width()/2, self.height()/2, self.width(), -self.height())
 
     antialiasing = True
-    t = Tile()
     sz = QtCore.QSize(*self._tileSize)
     hexRect = QRect(QPoint(0,0), sz)  # extends right and *down*
     img = QtGui.QImage(sz, QtGui.QImage.Format_ARGB32_Premultiplied)
     assert img.rect() == hexRect
     img.fill(0)  # creating a QPainter on uninitialized pixel data is undefined, in theory
     #img.fill(0xFFFFFFFF)  # creating a QPainter on uninitialized pixel data is undefined, in theory
-    for y in range(self._tileSize[1]):
-      img.setPixel(y,y, 0xFF00FF00)
-      img.setPixel(self._tileSize[0]-self._tileSize[1]+y,y, 0xFF00FF00)
+    #for y in range(self._tileSize[1]):
+    #  img.setPixel(y,y, 0xFF00FF00)
+    #  img.setPixel(self._tileSize[0]-self._tileSize[1]+y,y, 0xFF00FF00)
     img.setPixel(self._tileSize[0]-1, self._tileSize[1]-1, 0xFFFF00FF)
+
     imgPainter = QtGui.QPainter(img)
     #imgPainter.setWindow(-self._tileSize[0]/2.0, -self._tileSize[1]/2.0, self._tileSize[0], self._tileSize[1])
     hexPath = QtGui.QPainterPath()
-    hexPath.addPolygon(QtGui.QPolygonF(Hexagon(hexRect, antialiasing=False)))
-    #imgPainter.setClipPath(hexPath)
-    t.Draw(imgPainter, hexRect, antialiasing=antialiasing)
-    #imgPainter.setCompositionMode(QtGui.QPainter.CompositionMode_DestinationIn)
-    #bm = self.HexBitmap(antialiasing=False)
-    #imgPainter.drawPixmap(0,0,QtGui.QPixmap(bm))
+    hexPath.addPolygon(QtGui.QPolygonF(Hexagon(hexRect, antialiasing=antialiasing)))
+    hexPath.closeSubpath()
+    if antialiasing:
+      imgPainter.setRenderHint(QtGui.QPainter.Antialiasing)
+    imgPainter.setClipPath(hexPath)
 
-    widgetPainter.drawImage(0,0,img)
-    for i in range(16):
-      widgetPainter.drawImage(0,self._tileSize[1],img)
-    widgetPainter.drawImage(int(round(self._tileSize[0]*3/4.0)),self._tileSize[1]/2,img)
-    widgetPainter.drawImage(self._tileSize[0]*2+1, self._tileSize[1], img.scaled(sz*4))
-    for i in range(16):
-      widgetPainter.drawImage(self._tileSize[0]*2+1, -self._tileSize[1]*5, img.scaled(sz*4))
+    for vex in self._tiles:
+      t = self._tiles[vex]
+      imgPainter.setPen(t._pen)
+      imgPainter.drawPath(hexPath)
+      #t.Draw(imgPainter, hexRect, antialiasing=antialiasing)
+      x,y = self.Vexor2PixelCoords(vex)
+      widgetPainter.drawImage(x,y,img)
+      #widgetPainter.drawImage(int(round(self._tileSize[0]*3/4.0)),self._tileSize[1]/2,img)
+      #widgetPainter.drawImage(self._tileSize[0]*2+1, self._tileSize[1], img.scaled(sz*4))
+
     del imgPainter
     del img
     del widgetPainter
