@@ -5,6 +5,7 @@ import math
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import QPoint, QPointF, QRect, QRectF
 import qtmath, vexor5
+import simulation
 
 def Hexagon(aRect, duodectant=0, antialiasing=False):
   "Return a (slightly squashed or stretched) hexagonal QPolygon fitting a rectangle."
@@ -37,33 +38,63 @@ def Hexagon(aRect, duodectant=0, antialiasing=False):
     return QtGui.QPolygonF(map(lambda p: QPointF(p)+QPointF(0.5,0.5), pts))
   return QtGui.QPolygon(pts)
 
+textures2hsv = \
+  { simulation.Textures.VOID      : (  0,   0,   0)
+  , simulation.Textures.BULKHEAD  : (240,  15,  63)
+  , simulation.Textures.DECK      : (200,  15, 191)
+  }
+sevenHueMap = [0,30,60,120,180,240,300]
+
+def Texture2HSV(tx, pos):
+  'Given a texture and a vexor position, return a color.'
+  h,s,v = textures2hsv[tx]
+  if tx in (simulation.Textures.BULKHEAD, simulation.Textures.DECK):
+    tupity = vexor5.uniform3coloring(pos)
+    #h,s,v = (h, s, v + tupity*16 )
+    h,s,v = (sevenHueMap[tupity], s*3, v)
+  return (h,s,v)
+
 class Tile(object):
   "The rendering of a particular cell to a tile on the screen."
   def __init__(self, cell):
     super(Tile, self).__init__()
     self._cell = cell
     self._bgcolor = QtCore.Qt.black
-    self._pen = QtGui.QPen(QtCore.Qt.red)
-    self._pen.setWidth(1)
+    self._pen = QtGui.QPen(QtGui.QColor(31,31,31), .05)
+    #self._pen.setWidth(1)
     #self._pen = QtCore.Qt.NoPen
-    self._brush = QtGui.QBrush(QtCore.Qt.cyan)
+    self._selectionPen = QtGui.QPen(QtCore.Qt.white)
+    #self._brush = QtGui.QBrush(QtCore.Qt.cyan)
+    self._isSelected = False
     self.UpdateRenderSpec()
   def UpdateRenderSpec(self):
     self._renderSpec = tuple(self._cell.GetRenderSpec())
   def Draw(self, painter, aRect, antialiasing=False):
     "Draw cell representation into the given rect/hexagon"
     #painter.fillRect(-width/2,-height/2,width,height, self._bgcolor)
-    if antialiasing:
-      painter.setRenderHint(QtGui.QPainter.Antialiasing)
-    painter.setPen(self._pen)
-    painter.setBrush(self._brush)
-    #a = aRect.height()/2
-    #hexagon = qtmath.RegularPolygon(n=6, apothem=a, rotate=-math.pi/2)
+    #if antialiasing:
+    #  painter.setRenderHint(QtGui.QPainter.Antialiasing)
+    painter.setPen(QtCore.Qt.NoPen)
     hexagon = Hexagon(aRect, antialiasing=antialiasing)
-    painter.drawConvexPolygon(hexagon)
-    r = 8
-    painter.setBrush(QtGui.QBrush(QtCore.Qt.blue))
-    painter.drawEllipse(aRect.center(), r, r)
+    for (renderObj, arg) in self._renderSpec:
+      if renderObj == simulation.RenderObjects.BG:
+        painter.setBrush(QtGui.QBrush(QtGui.QColor.fromHsv(*Texture2HSV(arg, self._cell.Pos()))))
+        if self._isSelected:
+          painter.setPen(self._selectionPen)
+        painter.setPen(self._pen)
+        painter.drawConvexPolygon(hexagon)
+        painter.setPen(QtCore.Qt.NoPen)
+      elif renderObj == simulation.RenderObjects.TARGETING:
+        brush = QtGui.QBrush(QtGui.QColor(255,127,0), QtCore.Qt.Dense4Pattern)
+        brush.setTransform(QtGui.QTransform.fromScale(.1,.1))
+        painter.setBrush(brush)
+        painter.drawConvexPolygon(hexagon)
+      elif renderObj == simulation.RenderObjects.NPC or renderObj == simulation.RenderObjects.PLAYER:
+        painter.setBrush(QtGui.QColor.fromHsv(*arg))
+        #r = simulation.CELL_APOTHEM*3/8.0
+        r = aRect.width() * 3 / 8.0
+        print "Tile.Draw() NCP or PLAYER: r = {0}, center = {1}".format(r, aRect.center())
+        painter.drawEllipse(aRect.center(), r, r)
 
 class HexTileView(QtGui.QWidget):
   def __init__(self, parent, theSimulation):
@@ -71,7 +102,10 @@ class HexTileView(QtGui.QWidget):
     self._simulation = theSimulation
     self._tiles = {}   # map from Vexor to Tile
     self._renderCache = {}  # map from (renderSpec, size, orientation) to QImage
-    self._SetTileSize(12)
+    self._SetTileSize(17)
+    self._currentLayer = 0
+    self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent) # disable filling bg from parent widget
+    #self.setAutoFillBackground(False)       # disable filling bg from widget palette (default is False)
     self.AddCells(self._simulation._cells)
   def AddCells(self, cells):
     for vex in cells.iterkeys():
@@ -87,49 +121,55 @@ class HexTileView(QtGui.QWidget):
     return (x,y)
   def paintEvent(self, evt):
     widgetPainter = QtGui.QPainter(self)
-    widgetPainter.setWindow(-self.width()/2, -self.height()/2, self.width(), self.height())
-    # Set widget/window coordinate system: +y = up, center is (0,0)
-    #widgetPainter.setWindow(-self.width()/2, self.height()/2, self.width(), -self.height())
+    widgetPainter.fillRect(evt.rect(), QtCore.Qt.green)  # paint widget background
+    wRect = self.rect()
+    wRect.moveCenter(QPoint(0,0))  # (0,0) is now centered, +y is still down
+    widgetPainter.setWindow(wRect)
 
     antialiasing = True
+    #widgetPainter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
     sz = QtCore.QSize(*self._tileSize)
     hexRect = QRect(QPoint(0,0), sz)  # extends right and *down*
     hexPath = QtGui.QPainterPath()
     hexPath.addPolygon(QtGui.QPolygonF(Hexagon(hexRect, antialiasing=antialiasing)))
     hexPath.closeSubpath()
 
+    imgPainter = QtGui.QPainter()
+
     for vex in self._tiles:
+      if vex.v != self._currentLayer:
+        continue
       t = self._tiles[vex]
       key = t._renderSpec
       x,y = self.Vexor2PixelCoords(vex)
-      if key in self._renderCache:
-        widgetPainter.drawImage(x,y, self._renderCache[key])
-      else:
-        print "_renderCache miss"
+      if not key in self._renderCache:
+        print "HexTileView.paintEvent(): _renderCache miss"
         img = QtGui.QImage(sz, QtGui.QImage.Format_ARGB32_Premultiplied)
         #assert img.rect() == hexRect
-        img.fill(0)  # creating a QPainter on uninitialized pixel data is undefined, in theory
-        #img.fill(0xFFFFFFFF)  # creating a QPainter on uninitialized pixel data is undefined, in theory
+        # Fill image, because in theory
+        # creating a QPainter on uninitialized pixel data is undefined,
+        # even if every pixel will be subsequently be overwritten.
+        img.fill(QtGui.QColor(0xFF, 0, 0xFF, 0))
         #for y in range(self._tileSize[1]):
         #  img.setPixel(y,y, 0xFF00FF00)
         #  img.setPixel(self._tileSize[0]-self._tileSize[1]+y,y, 0xFF00FF00)
         #img.setPixel(self._tileSize[0]-1, self._tileSize[1]-1, 0xFFFF00FF)
 
-        imgPainter = QtGui.QPainter(img)
+        #imgPainter = QtGui.QPainter(img)  # TODO: compare performance of ctor/del vs begin/end
+        imgPainter.begin(img)
         #imgPainter.setWindow(-self._tileSize[0]/2.0, -self._tileSize[1]/2.0, self._tileSize[0], self._tileSize[1])
         if antialiasing:
           imgPainter.setRenderHint(QtGui.QPainter.Antialiasing)
         imgPainter.setClipPath(hexPath)
-
-        imgPainter.setPen(t._pen)
+        #imgPainter.setPen(t._pen)
         #imgPainter.drawPath(hexPath)
         t.Draw(imgPainter, hexRect, antialiasing=antialiasing)
+        #del imgPainter
+        imgPainter.end()
+
         self._renderCache[key] = img
-        widgetPainter.drawImage(x,y,img)
-        #widgetPainter.drawImage(int(round(self._tileSize[0]*3/4.0)),self._tileSize[1]/2,img)
-        #widgetPainter.drawImage(self._tileSize[0]*2+1, self._tileSize[1], img.scaled(sz*4))
 
-        del imgPainter
-
-    del widgetPainter
+      # Note that since the screen does not have an alpha channel,
+      # any transparent pixels will at this point be made visible?
+      widgetPainter.drawImage(x,y, self._renderCache[key])
 
