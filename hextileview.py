@@ -149,7 +149,11 @@ class HexTileView(QtGui.QWidget):
         # Fill image, because in theory
         # creating a QPainter on uninitialized pixel data is undefined,
         # even if every pixel will be subsequently be overwritten.
-        img.fill(QtGui.QColor(0xFF, 0, 0xFF, 0))
+        # I would like to fill using transparent magenta, but under PyQt 4.6,
+        # QImage.fill() won't accept QColors and seems to incorrectly
+        # interpret Python long integers, introducing bad bits.
+        #img.fill(QtGui.QColor(0xFF, 0, 0xFF, 0).rgba())
+        img.fill(QtCore.Qt.transparent)
         #for y in range(self._tileSize[1]):
         #  img.setPixel(y,y, 0xFF00FF00)
         #  img.setPixel(self._tileSize[0]-self._tileSize[1]+y,y, 0xFF00FF00)
