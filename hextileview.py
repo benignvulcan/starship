@@ -60,7 +60,8 @@ class Tile(object):
     super(Tile, self).__init__()
     self._cell = cell
     self._bgcolor = QtCore.Qt.black
-    self._pen = QtGui.QPen(QtGui.QColor(31,31,31), .05)
+    #self._pen = QtGui.QPen(QtGui.QColor(31,31,31), .05)
+    self._pen = QtGui.QPen(QtGui.QColor(255,0,0), 2)
     #self._pen.setWidth(1)
     #self._pen = QtCore.Qt.NoPen
     self._selectionPen = QtGui.QPen(QtCore.Qt.white)
@@ -92,9 +93,9 @@ class Tile(object):
       elif renderObj == simulation.RenderObjects.NPC or renderObj == simulation.RenderObjects.PLAYER:
         painter.setBrush(QtGui.QColor.fromHsv(*arg))
         #r = simulation.CELL_APOTHEM*3/8.0
-        r = aRect.width() * 3 / 8.0
+        r = int(aRect.width()/2) * 2 / 3.0
         print "Tile.Draw() NCP or PLAYER: r = {0}, center = {1}".format(r, aRect.center())
-        painter.drawEllipse(aRect.center(), r, r)
+        painter.drawEllipse(QRectF(aRect).center(), r, r)
 
 class HexTileView(QtGui.QWidget):
   def __init__(self, parent, theSimulation):
@@ -102,8 +103,10 @@ class HexTileView(QtGui.QWidget):
     self._simulation = theSimulation
     self._tiles = {}   # map from Vexor to Tile
     self._renderCache = {}  # map from (renderSpec, size, orientation) to QImage
-    self._SetTileSize(17)
+    self._zoom = 4
+    self._SetTileSize(self._zoom * 8)
     self._currentLayer = 0
+    self.setFocusPolicy(QtCore.Qt.StrongFocus)
     self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent) # disable filling bg from parent widget
     #self.setAutoFillBackground(False)       # disable filling bg from widget palette (default is False)
     self.AddCells(self._simulation._cells)
@@ -111,9 +114,17 @@ class HexTileView(QtGui.QWidget):
     for vex in cells.iterkeys():
       t = Tile(cells[vex])
       self._tiles[vex] = t
+  def _SetZoom(self, z):
+    self._zoom = z
+    self._SetTileSize(self._zoom * 8)
+    self.update()
+  def Zoom(self, dz):
+    z = self._zoom + dz
+    if z > 0 and z < 128:
+      self._SetZoom(z)
   def _SetTileSize(self, height):
     self._tileSize = (int(round(height*2/math.sqrt(3))), height)
-    self._tileSpacing = (self._tileSize[0] - int(round(height/4.0)) - 1, height)  # see Hexagon()
+    self._tileSpacing = (self._tileSize[0] - int(round(height/4.0)) - 2, height - 1)  # see Hexagon()
     print "tileSize = {0}, tileSpacing = {1}".format(self._tileSize, self._tileSpacing)
   def Vexor2PixelCoords(self, v):
     x = self._tileSpacing[0] * v.x
@@ -140,7 +151,7 @@ class HexTileView(QtGui.QWidget):
       if vex.v != self._currentLayer:
         continue
       t = self._tiles[vex]
-      key = t._renderSpec
+      key = (t._renderSpec, self._zoom)
       x,y = self.Vexor2PixelCoords(vex)
       if not key in self._renderCache:
         print "HexTileView.paintEvent(): _renderCache miss"
@@ -176,4 +187,13 @@ class HexTileView(QtGui.QWidget):
       # Note that since the screen does not have an alpha channel,
       # any transparent pixels will at this point be made visible?
       widgetPainter.drawImage(x,y, self._renderCache[key])
+
+  def keyPressEvent(self, evt):
+    k = evt.key()
+    print "HexTileView.keyPressEvent(): {0}".format(k)
+    if k == QtCore.Qt.Key_Plus:
+      self.Zoom(1)
+    elif k == QtCore.Qt.Key_Minus:
+      self.Zoom(-1)
+    QtGui.QWidget.keyPressEvent(self, evt) # pass unhandled events to parent class
 
