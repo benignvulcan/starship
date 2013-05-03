@@ -3,7 +3,7 @@
 
 import math
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QPoint, QPointF, QRect, QRectF
+from PyQt4.QtCore import QPoint, QPointF, QRect, QRectF, QSize, QSizeF
 import qtmath, vexor5
 import simulation
 
@@ -24,6 +24,13 @@ def Hexagon(aRect, duodectant=0, antialiasing=False):
           ]
   else:
     # points left and right, flats top and bottom
+    # |<--->|  x spacing = width * 3/4
+    #   ____  _
+    #  /\  /\
+    # /__\/__\   y spacing = height
+    # \  /\  /
+    #  \/__\/ _
+    #
     xq = round(aRect.width() / 4.0)
     pts = [ QPoint(aRect.right(), yc)
           , QPoint(xc+xq, aRect.top())
@@ -123,39 +130,51 @@ class HexTileView(QtGui.QWidget):
     if z > 0 and z < 128:
       self._SetZoom(z)
   def _SetTileSize(self, height):
-    self._tileSize = (int(round(height*2/math.sqrt(3))), height)
-    self._tileSpacing = (self._tileSize[0] - int(round(height/4.0)) - 2, height - 1)  # see Hexagon()
-    print "tileSize = {0}, tileSpacing = {1}".format(self._tileSize, self._tileSpacing)
+    '''Given the height (in whole pixels) of a hexagonal tile, compute
+    the width and round off (distort) to the nearest whole pixel, so that
+    (slightly distorted) hexagons will tile nicely.'''
+    s = round(height*2/math.sqrt(3)) / height
+    self._tileSize = QSize(int(height*s), height)
+    self._tileCenter = QPoint(int(height*s/2), int(height/2))
+    self._tileSpacing = QSize(int(self._tileSize.width()*3/4.0), height-1)  # see Hexagon()
+    print "tileSize = {0}, tileCenter= {1}, tileSpacing = {2}".format(
+      self._tileSize, self._tileCenter, self._tileSpacing)
   def Vexor2PixelCoords(self, v):
-    x = self._tileSpacing[0] * v.x
-    y = self._tileSpacing[1] * (v.y - v.z)/2.0
-    return (x,y)
+    x = self._tileSpacing.width() * v.x
+    y = -self._tileSpacing.height() * (v.y - v.z)/2.0
+    return QPoint(x,y)  # +y = down
+  def Pixel2Vexor(self, qpt):
+    # qpt +y = down
+    sx = qpt.x() / self._tileSpacing.width()
+    sy = -qpt.y() / self._tileSpacing.height()
+    y = sy - sx/2.0
+    z = -sx/2.0 - sy
+    return vexor5.Vexor(sx,y,z,0,0)
   def paintEvent(self, evt):
     widgetPainter = QtGui.QPainter(self)
     widgetPainter.fillRect(evt.rect(), QtCore.Qt.green)  # paint widget background
     wRect = self.rect()
     wRect.moveCenter(QPoint(0,0))  # (0,0) is now centered, +y is still down
-    widgetPainter.setWindow(wRect)
+    widgetPainter.setWindow(wRect) # translate window painting coordinates
 
     antialiasing = True
     #widgetPainter.setCompositionMode(QtGui.QPainter.CompositionMode_SourceOver)
-    sz = QtCore.QSize(*self._tileSize)
-    hexRect = QRect(QPoint(0,0), sz)  # extends right and *down*
+    hexRect = QRect(QPoint(0,0), self._tileSize)  # extends right and *down*
     hexPath = QtGui.QPainterPath()
     hexPath.addPolygon(QtGui.QPolygonF(Hexagon(hexRect, antialiasing=antialiasing)))
     hexPath.closeSubpath()
 
     imgPainter = QtGui.QPainter()
 
-    for vex in self._tiles:
+    for vex in self._tiles:  # TODO: only iterate through visible tiles
       if vex.v != self._currentLayer:
         continue
       t = self._tiles[vex]
       key = (t._renderSpec, self._zoom)
-      x,y = self.Vexor2PixelCoords(vex)
+      xy = self.Vexor2PixelCoords(vex) - self._tileCenter
       if not key in self._renderCache:
         print "HexTileView.paintEvent(): _renderCache miss"
-        img = QtGui.QImage(sz, QtGui.QImage.Format_ARGB32_Premultiplied)
+        img = QtGui.QImage(self._tileSize, QtGui.QImage.Format_ARGB32_Premultiplied)
         #assert img.rect() == hexRect
         # Fill image, because in theory
         # creating a QPainter on uninitialized pixel data is undefined,
@@ -186,7 +205,17 @@ class HexTileView(QtGui.QWidget):
 
       # Note that since the screen does not have an alpha channel,
       # any transparent pixels will at this point be made visible?
-      widgetPainter.drawImage(x,y, self._renderCache[key])
+      widgetPainter.drawImage(xy, self._renderCache[key])
+    if True:
+      # draw centered crosshairs
+      widgetPainter.setPen(QtCore.Qt.white)
+      widgetPainter.drawLine(-100,0, 100,0)
+      widgetPainter.drawLine(0,-100, 0,100)
+
+  def mousePressEvent(self, evt):
+    pos = evt.pos() - self.rect().center()
+    vex = self.Pixel2Vexor(pos)
+    print "HexTileView.mousePressEvent @ {0} -> {1}".format(pos, vex)
 
   def keyPressEvent(self, evt):
     k = evt.key()
