@@ -144,12 +144,30 @@ class HexTileView(QtGui.QWidget):
     print "tileSize = {0}, tileCenter= {1}, tileSpacing = {2}".format(
       self._tileSize, self._tileCenter, self._tileSpacing)
   def Vexor2PixelCoords(self, v):
+    # return viewport coords of upper left corner of blitting rectangle
     assert v.isValid()
     assert v.vexorInt() == v
     x = self._tileSpacing.width() * v.x
     y = -self._tileSpacing.height() * (v.y - v.z)/2.0  # include y axis flip
     return QPoint(x,y) - self._tileCenter  # +y = down
   def Pixel2Vexor(self, qpt):
+    # return which hexagon viewport point is in
+    qpt = qpt + self._tileCenter
+    px = qpt.x()
+    py = -qpt.y()
+    
+    x = px / self._tileSpacing.width()
+    y = py*2 / self._tileSpacing.height() + 1
+    
+    vx = x
+    vy = (y - x+1)/2
+    vz = (-y - x)/2
+
+    vex = vexor5.Vexor(vx,vy,vz,0,0)
+    print "HexTileView.Pixel2Vexor @ {0:+04d},{1:+04d} -> {2}".format(x, y, vex)
+    assert vex.isValid()
+    return vex
+  
     # qpt +y = down
     assert isinstance(qpt, QPoint)
     qpt = qpt + self._tileCenter
@@ -157,7 +175,7 @@ class HexTileView(QtGui.QWidget):
     sy = -qpt.y() / self._tileSpacing.height()  # includes y axis flip
     y = sy - sx/2.0                             # y - x/_S/2.0
     z = -sx/2.0 - sy                            # -x/_S/2.0 - y
-    vex = vexor5.Vexor(sx,y,z,0,0)
+    vex = vexor5.Vexor(sx,y,z,0,0).vexorInt()
     assert vex.isValid()
     return vex
   def paintEvent(self, evt):
