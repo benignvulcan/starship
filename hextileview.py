@@ -8,7 +8,7 @@ import qtmath, vexor5
 import simulation
 
 def Hexagon(aRect, duodectant=0, antialiasing=False):
-  "Return a (slightly squashed or stretched) hexagonal QPolygon fitting a rectangle."
+  "Return a hexagonal QPolygon stretched to fit the given rectangle."
   # Note that QRects are inherently oriented to a +y=down coordinate system
   xc = aRect.center().x()
   yc = aRect.center().y()
@@ -63,6 +63,7 @@ def Texture2HSV(tx, pos):
 
 class Tile(object):
   "The rendering of a particular cell to a tile on the screen."
+  # Just does rendering; caching is handled elsewhere.
   def __init__(self, cell):
     super(Tile, self).__init__()
     self._cell = cell
@@ -112,7 +113,7 @@ class HexTileView(QtGui.QWidget):
     self._simulation = theSimulation
     self._tiles = {}   # map from Vexor to Tile
     self._renderCache = {}  # map from (renderSpec, size, orientation) to QImage
-    self._zoom = 4
+    self._zoom = 16
     self._SetTileSize(self._zoom * 8)
     self._currentLayer = 0
     self._selectionSet = set()
@@ -155,27 +156,37 @@ class HexTileView(QtGui.QWidget):
     qpt = qpt + self._tileCenter
     px = qpt.x()
     py = -qpt.y()
-    
-    x = px / self._tileSpacing.width()
-    y = py*2 / self._tileSpacing.height() + 1
+
+    (x, xrem) = divmod(px, self._tileSpacing.width())
+    (yh, yrem) = divmod(py*2, self._tileSize.height())  # half height
+    yh += 1
+
+    # Is the point not in the inscribed rectangle?
+    if xrem < self._tileSize.width() / 4:
+      (y, yrem) = divmod(py, self._tileSize.height())  # full height
+      # Is the point in "this" hex, or one of the two to the left?
+      #if yrem <
+      A = (0, self._tileSize.height()/2)
+      Bpos = (self._tileSize.width()/4, 0)
+      Bneg = (self._tileSize.width()/4, self._tileSize.height())
+      # det = (Bx-Ax)*(Y-Ay) - (By-Ay)*(X-Ax)
+      detPos = (Bpos[0]-A[0])*(yrem-A[1]) - (Bpos[1]-A[1])*(xrem-A[0])
+      detNeg = (Bneg[0]-A[0])*(yrem-A[1]) - (Bneg[1]-A[1])*(xrem-A[0])
+      if detPos < 0:
+        # clicked in -X,+Y neighbor
+        x -= 1
+      if detNeg > 0:
+        pass# clicked in -X,-Y neighbor
+        #x -= 1
+        #y -= 1
+      print "x quarter check, xrem={0}, yrem={1}, detPos={2}, detNeg={3}".format(xrem,yrem,detPos,detNeg)
     
     vx = x
-    vy = (y - x+1)/2
-    vz = (-y - x)/2
+    vy = ( yh - x+1)/2
+    vz = (-yh - x  )/2
 
     vex = vexor5.Vexor(vx,vy,vz,0,0)
-    print "HexTileView.Pixel2Vexor @ {0:+04d},{1:+04d} -> {2}".format(x, y, vex)
-    assert vex.isValid()
-    return vex
-  
-    # qpt +y = down
-    assert isinstance(qpt, QPoint)
-    qpt = qpt + self._tileCenter
-    sx = qpt.x() / self._tileSpacing.width()    # x/_S
-    sy = -qpt.y() / self._tileSpacing.height()  # includes y axis flip
-    y = sy - sx/2.0                             # y - x/_S/2.0
-    z = -sx/2.0 - sy                            # -x/_S/2.0 - y
-    vex = vexor5.Vexor(sx,y,z,0,0).vexorInt()
+    print "HexTileView.Pixel2Vexor @ {0:+04d},{1:+04d} -> {2}".format(px, py, vex)
     assert vex.isValid()
     return vex
   def paintEvent(self, evt):
