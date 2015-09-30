@@ -1,6 +1,7 @@
 
 import sys, math, numbers, collections, unittest
 
+# The height of a flat-topped hexgon is width * sqrt(3)/2
 _S = math.sqrt(3.0)/2.0 # + sys.float_info.epsilon does not really help
 _EPSILON = 10 ** (2 - sys.float_info.dig)  # experimentally determined number of digits
 
@@ -49,10 +50,11 @@ class Vexor(collections.namedtuple('VexorTuple','x y z v w')):
   '''
   # Cartesian slope of hex y axis is sqrt(3), perpendicular is -1/sqrt(3) = -sqrt(3)/3
   # As far as I can tell, this is a valid vector space.
+  __slots__ = ()  # Save time & space by leaving out per-instance attribute dictionary
   def __repr__(self):
     return "Vexor(%g,%g,%g, %g,%g)" % self
   def isValid(self):
-    return abs(self.x + self.y + self.z) < _EPSILON
+    return all(isinstance(n,numbers.Real) for n in self) and abs(self.x + self.y + self.z) < _EPSILON
   def __add__(self, other):
     return Vexor(self.x+other.x, self.y+other.y, self.z+other.z, self.v+other.v, self.w+other.w)
   def __sub__(self, other):
@@ -115,6 +117,7 @@ class Vexor(collections.namedtuple('VexorTuple','x y z v w')):
     return (self - other).manhattanLength()
 
 def toVexor(x,y,z,w):
+  "Where x,y = 2D cartesian coordinates, z = vertical = cartesian z, w = fourth spatial dimension"
   return Vexor( x/_S, y - x/_S/2.0, -x/_S/2.0 - y, z, w)
 
 def sectorRange(r=None, rstop=None, rstep=1, sextant_start=0, sextant_stop=6, sextant_step=1, cell_step=1):
@@ -230,6 +233,16 @@ class TestVexor(unittest.TestCase):
     for n in NEIGHBORS_4D:
       self.assertEqual( n.manhattanLength(), 1 )
       self.assertEqual( n.manhattanDistance(ZERO), 1 )
+      for s in range(0,99):
+        sth = s / 100.0
+        #print "sth =",sth
+        self.assertEqual( (n*sth).vexorInt(), ZERO )
+        if s < 50:
+          self.assertEqual( (n*sth).vexorInt(round), ZERO )
+        else:
+          self.assertEqual( (n*sth).vexorInt(round), n )
+        #for m in NEIGHBORS_4D:
+        #  self.assertEqual( (n + m*sth).vexorInt(), n )  # this will fail
     for n in _R2_2D:
       self.assertEqual( n.manhattanLength(), 2 )
       self.assertEqual( n.manhattanDistance(ZERO), 2 )
