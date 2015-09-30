@@ -113,6 +113,7 @@ class HexTileView(QtGui.QWidget):
     self._simulation = theSimulation
     self._tiles = {}   # map from Vexor to Tile
     self._renderCache = {}  # map from (renderSpec, size, orientation) to QImage
+    self._coordRenderCache = {}  # map from (vexor,size) to QImage
     self._zoom = 16
     self._SetTileSize(self._zoom * 8)
     self._currentLayer = 0
@@ -135,8 +136,8 @@ class HexTileView(QtGui.QWidget):
       self._SetZoom(z)
   def _SetTileSize(self, height):
     '''Given the height (in whole pixels) of a hexagonal tile, compute
-    the width and round off (distort) to the nearest whole pixel, so that
-    (slightly distorted) hexagons will tile nicely.'''
+    the width and round it off (distort it) to the nearest whole pixel,
+    so that (slightly distorted) hexagons will tile nicely.'''
     assert int(height) == height
     s = round(height*2/math.sqrt(3)) / height
     self._tileSize = QSize(int(height*s), height)
@@ -144,7 +145,7 @@ class HexTileView(QtGui.QWidget):
     self._tileSpacing = QSize(int(self._tileSize.width()*3/4.0), height-1)  # see Hexagon()
     print "tileSize = {0}, tileCenter= {1}, tileSpacing = {2}".format(
       self._tileSize, self._tileCenter, self._tileSpacing)
-  def Vexor2PixelCoords(self, v):
+  def Vexor2TileCorner(self, v):
     # return viewport coords of upper left corner of blitting rectangle
     assert v.isValid()
     assert v.vexorInt() == v
@@ -153,9 +154,11 @@ class HexTileView(QtGui.QWidget):
     return QPoint(x,y) - self._tileCenter  # +y = down
   def Pixel2Vexor(self, qpt):
     # return which hexagon viewport point is in
-    qpt = qpt + self._tileCenter
-    px = qpt.x()
-    py = -qpt.y()
+    qpt_ = qpt + self._tileCenter
+    (px,py) = (qpt_.x(), -qpt_.y())
+
+    (sx,sy) = (qpt.x() / float(self._tileSize.width()), -qpt.y() / float(self._tileSize.height()))
+    print "toVexor({0},{1}) = {2}n".format(sx,sy,vexor5.toVexor(sx,sy,0,0))
 
     (x, xrem) = divmod(px, self._tileSpacing.width())
     (yh, yrem) = divmod(py*2, self._tileSize.height())  # half height
@@ -214,7 +217,7 @@ class HexTileView(QtGui.QWidget):
         continue
       t = self._tiles[vex]
       key = (t._renderSpec, t._isSelected, self._zoom)
-      xy = self.Vexor2PixelCoords(vex)
+      xy = self.Vexor2TileCorner(vex)
       if not key in self._renderCache:
         print "HexTileView.paintEvent(): _renderCache miss"
         img = QtGui.QImage(self._tileSize, QtGui.QImage.Format_ARGB32_Premultiplied)
@@ -247,9 +250,20 @@ class HexTileView(QtGui.QWidget):
         self._renderCache[key] = img
 
       widgetPainter.drawImage(xy, self._renderCache[key])
+
       if True:
-        txt = "{0},{1},{2}".format(vex.x, vex.y, vex.z)
-        widgetPainter.drawText(QRect(xy,self._tileSize), QtCore.Qt.AlignCenter, txt)
+        key = (vex,self._zoom)
+        if not key in self._coordRenderCache:
+          img = QtGui.QImage(self._tileSize, QtGui.QImage.Format_ARGB32_Premultiplied)
+          img.fill(QtCore.Qt.transparent)
+          imgPainter.begin(img)
+          txt = "{0},{1},{2}".format(vex.x, vex.y, vex.z)
+          #imgPaint.drawText(QRect(xy,self._tileSize), QtCore.Qt.AlignCenter, txt)
+          imgPainter.drawText(hexRect, QtCore.Qt.AlignCenter, txt)
+          imgPainter.end()
+          self._coordRenderCache[key] = img
+        widgetPainter.drawImage(xy, self._coordRenderCache[key])
+
     if True:
       # draw centered crosshairs
       widgetPainter.setPen(QtCore.Qt.white)
