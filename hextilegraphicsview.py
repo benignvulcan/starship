@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QPointF, QRectF
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QPointF, QRectF
 #from PyQt4.QtGui  import QBrush, QColor, QPen, QPolygonF
 #import simulation
 import action
 
-class HexTileGraphicsView(QtGui.QGraphicsView):
+class HexTileGraphicsView(QtWidgets.QGraphicsView):
   '''
     A view on to a HexTileGraphicsScene. (There may be other views on the same scene.)
       No scroll bars. (not implemented yet)
@@ -17,7 +17,7 @@ class HexTileGraphicsView(QtGui.QGraphicsView):
   model_event = QtCore.pyqtSignal(int)
 
   def __init__(self, parent):
-    QtGui.QGraphicsView.__init__(self, parent)
+    QtWidgets.QGraphicsView.__init__(self, parent)
     #self.setOptimizationFlags(self.DontAdjustForAntialiasing) # does not disbale antialiasing!
     #self.setDragMode(QtGui.QGraphicsView.RubberBandDrag)  # set via Designer
     self._zoom = 1.0
@@ -113,7 +113,7 @@ class HexTileGraphicsView(QtGui.QGraphicsView):
       self.ZoomOut()
     else:
       print "HexTileGraphicsView.keyPressEvent(): key=%08x, modifers=%08x" % (k,m)
-      QtGui.QGraphicsView.keyPressEvent(self, event)
+      QtWidgets.QGraphicsView.keyPressEvent(self, event)
     #print type(k), type(m), type(QtCore.Qt.Key_Right), type(QtCore.Qt.NoModifier)
   def keyReleaseEvent(self, event):
     k = int(event.key())

@@ -1,8 +1,8 @@
 
 import math, unittest
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QPointF, QRectF
-from PyQt4.QtGui import QPolygonF
+from PyQt5 import QtCore, QtGui
+from PyQt5.QtCore import QPointF, QRectF
+from PyQt5.QtGui import QPolygonF
 
 # These are apparently not defined by PyQt,
 # but are implicitly converted to/from Python lists.

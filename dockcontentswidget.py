@@ -1,7 +1,7 @@
 
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 
-class DockContentsWidget(QtGui.QWidget):
+class DockContentsWidget(QtWidgets.QWidget):
   '''A QWidget that returns a sizeHint despite the lack of a layout for it.
 
   QDockWidget is so busy being a sometimes-docked-sometimes-floating window

@@ -9,9 +9,9 @@ u'''<p>Version %d.%d
 
 import sys, time, unittest
 
-from PyQt4 import QtCore, QtGui, uic
+from PyQt5 import QtCore, QtGui, QtWidgets, uic
 #from PyQt4 import QtOpenGL
-from PyQt4.QtGui  import QBrush, QColor, QPen
+from PyQt5.QtGui  import QBrush, QColor, QPen
 
 import scene, simulation, action, job, sim_object
 import hextileview
@@ -19,7 +19,7 @@ import hextileview
 
 if True:
   from starshipMainWindow_ui import Ui_StarshipMainWindow
-  StarshipMainWindow_base = QtGui.QMainWindow
+  StarshipMainWindow_base = QtWidgets.QMainWindow
 else:
   (Ui_StarshipMainWindow, StarshipMainWindow_base) = uic.loadUiType('starshipMainWindow.ui')
 
@@ -32,7 +32,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     self.menuBuild.setEnabled(False)
 
     #self.simulationParameters.setVisible(False) # does not toggle menu item
-    self.actionSimulationParameters.activate(QtGui.QAction.Trigger)
+    self.actionSimulationParameters.activate(QtWidgets.QAction.Trigger)
 
     self._simModel = simulation.Simulation(qparent=self)
 
@@ -81,14 +81,14 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     self.perfTimer.timeout.connect(self.perfUpdate)
     self.perfTimer.start(1000)
 
-    self.actionAboutQt.triggered.connect(QtGui.qApp.aboutQt)
+    self.actionAboutQt.triggered.connect(QtWidgets.qApp.aboutQt)
     self.actionSimRunning.setChecked(False)
 
     #f = self.statusBar().font()
     #f.setFixedPitch(True)
     #f.setKerning(False)
     #self.statusBar().setFont(f)
-    self.performanceStatus = QtGui.QLabel()
+    self.performanceStatus = QtWidgets.QLabel()
     self.statusBar().addWidget(self.performanceStatus)
 
     print "simDockContents.sizeHint() =", self.simulationDockContents.sizeHint()
@@ -158,8 +158,8 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
     k = event.key()
     if k == QtCore.Qt.Key_Escape:
       self.on_actionSimRunning_toggled(False)
-      #QtGui.QMessageBox.information(self, "keyPressEvent", "Don't press Escape")
-      #QtGui.QApplication.quit()
+      #QtWidgets.QMessageBox.information(self, "keyPressEvent", "Don't press Escape")
+      #QtWidgets.QApplication.quit()
     #elif k == QtCore.Qt.Key_Space:
     #  self.action_SimRunning.toggle()
     elif k == QtCore.Qt.Key_G:
@@ -220,7 +220,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
       #self.simTimer.start(1000/sRate)
       self.simTimer.start(self.SLICE*1000)
       self.frameTimer.start(1000/self.frameRateLimit.value())
-      #self.hexView.setViewportUpdateMode(QtGui.QGraphicsView.NoViewportUpdate)
+      #self.hexView.setViewportUpdateMode(QtWidgets.QGraphicsView.NoViewportUpdate)
     else:
       self.simTimer.stop()
       self.frameTimer.stop()
@@ -268,7 +268,7 @@ class StarshipMainWindow(Ui_StarshipMainWindow, StarshipMainWindow_base):
 
   @QtCore.pyqtSlot()
   def on_actionAbout_triggered(self):
-    QtGui.QMessageBox.about(self, app_title, app_about_html)
+    QtWidgets.QMessageBox.about(self, app_title, app_about_html)
 
 def main():
   #print sys.argv
@@ -276,8 +276,8 @@ def main():
   #   "-graphicssystem opengl" even faster still.
   #   default is "-graphicssystem native"
   # Translates into:
-  #   QtGui.QApplication.setGraphicsSystem("raster") # must be done before constructing QApplication
-  global_app = QtGui.QApplication(sys.argv)
+  #   QtWidgets.QApplication.setGraphicsSystem("raster") # must be done before constructing QApplication
+  global_app = QtWidgets.QApplication(sys.argv)
   if '-h' in sys.argv or '--help' in sys.argv:
     print sys.argv
     print "usage: $0 -graphicssystem (raster|opengl)"

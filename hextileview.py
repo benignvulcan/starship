@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import math
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QPoint, QPointF, QRect, QRectF, QSize, QSizeF
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QPoint, QPointF, QRect, QRectF, QSize, QSizeF
 import qtmath, vexor5
 import simulation
 
@@ -107,9 +107,9 @@ class Tile(object):
         print "Tile.Draw() NCP or PLAYER: r = {0}, center = {1}".format(r, aRect.center())
         painter.drawEllipse(QRectF(aRect).center(), r, r)
 
-class HexTileView(QtGui.QWidget):
+class HexTileView(QtWidgets.QWidget):
   def __init__(self, parent, theSimulation):
-    QtGui.QWidget.__init__(self, parent)
+    QtWidgets.QWidget.__init__(self, parent)
     self._simulation = theSimulation
     self._tiles = {}   # map from Vexor to Tile
     self._renderCache = {}  # map from (renderSpec, size, orientation) to QImage
@@ -291,5 +291,5 @@ class HexTileView(QtGui.QWidget):
     elif k == QtCore.Qt.Key_Minus:
       self.Zoom(-1)
     else:
-      QtGui.QWidget.keyPressEvent(self, evt) # pass unhandled events to parent class
+      QtWidgets.QWidget.keyPressEvent(self, evt) # pass unhandled events to parent class
 

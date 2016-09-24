@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import math
-from PyQt4 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 #from PyQt4 import QtOpenGL
-from PyQt4.QtGui  import QBrush, QColor, QPen
+from PyQt5.QtGui  import QBrush, QColor, QPen
 
 from qtmath import *
 import simulation
@@ -26,11 +26,11 @@ def Texture2HSV(tx, pos):
     h,s,v = (sevenHueMap[tupity], s*3, v)
   return (h,s,v)
 
-#class GraphicsLayerItem(QtGui.QGraphicsItemGroup):
-class GraphicsLayerItem(QtGui.QGraphicsRectItem):
+#class GraphicsLayerItem(QtWidgets.QGraphicsItemGroup):
+class GraphicsLayerItem(QtWidgets.QGraphicsRectItem):
   pass
 
-class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
+class GraphicsTileItem(QtWidgets.QGraphicsPolygonItem):
   ''' A graphical description of a single hexagonal cell.
   '''
 
@@ -48,20 +48,20 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
     cls.selectionPen = QtGui.QPen(QtCore.Qt.white, .05)
 
   def __init__(self, cell, parent):
-    QtGui.QGraphicsPolygonItem.__init__(self, self.hexagon_qpolyf, parent)
+    QtWidgets.QGraphicsPolygonItem.__init__(self, self.hexagon_qpolyf, parent)
     self._cell = cell
     self._renderSpec = ()   # a list of instructions on how to render this cell
     self._renderCache = {}  # map from (renderSpec,level_of_detail) to QPixMap
     self.setFlags( self.flags()
-                 | QtGui.QGraphicsItem.ItemIsSelectable
-                 | QtGui.QGraphicsItem.ItemIsFocusable
-                #| QtGui.QGraphicsItem.ItemIgnoresTransformations
-                #| QtGui.QGraphicsItem.ItemClipsToShape
-                #| QtGui.QGraphicsItem.ItemIsMovable
+                 | QtWidgets.QGraphicsItem.ItemIsSelectable
+                 | QtWidgets.QGraphicsItem.ItemIsFocusable
+                #| QtWidgets.QGraphicsItem.ItemIgnoresTransformations
+                #| QtWidgets.QGraphicsItem.ItemClipsToShape
+                #| QtWidgets.QGraphicsItem.ItemIsMovable
                  )
     # speeds window sizing and repainting, but not zooming or rotating
-    self.setCacheMode(QtGui.QGraphicsItem.DeviceCoordinateCache)
-    #self.setCacheMode(QtGui.QGraphicsItem.ItemCoordinateCache)   # looks hideous, but it is even faster
+    self.setCacheMode(QtWidgets.QGraphicsItem.DeviceCoordinateCache)
+    #self.setCacheMode(QtWidgets.QGraphicsItem.ItemCoordinateCache)   # looks hideous, but it is even faster
     self.setPen(QtGui.QPen(QtGui.QColor(31,31,31), .05))
     self.setBrush(QtCore.Qt.yellow)
     self.UpdateRenderSpec()
@@ -126,7 +126,7 @@ class GraphicsTileItem(QtGui.QGraphicsPolygonItem):
 
 GraphicsTileItem.InitClassVariables()  # move this into main() if it stops working here
 
-class HexTileGraphicsScene(QtGui.QGraphicsScene):
+class HexTileGraphicsScene(QtWidgets.QGraphicsScene):
   '''
     The graphical description of (a portion) of a hex tiled model.
     It is NOT the model, nor the view.
@@ -137,7 +137,7 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     Sceen (and View) is in screen coordinates.
   '''
   def __init__(self, model):
-    QtGui.QGraphicsScene.__init__(self)
+    QtWidgets.QGraphicsScene.__init__(self)
     self._model = model  # simulation
     self._vexor2item = { } # map from Vexor to [list of] GraphicsTileItem
     self._layers = {}    # map from z values to GraphicsItem layer master objects
@@ -146,8 +146,8 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     self.setBackgroundBrush(QtCore.Qt.black)
     #self.addAxisLines()
     self.CreateLayers(self._model._cells)
-    assert self.itemIndexMethod() == QtGui.QGraphicsScene.BspTreeIndex
-    #self.setItemIndexMethod(QtGui.QGraphicsScene.NoIndex)
+    assert self.itemIndexMethod() == QtWidgets.QGraphicsScene.BspTreeIndex
+    #self.setItemIndexMethod(QtWidgets.QGraphicsScene.NoIndex)
     print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
     self.addCells(self._model._cells)
     print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
@@ -155,8 +155,8 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
     #  self.setBspTreeDepth(6)
     #  print "HexTileGraphicsScene.bspTreeDepth = {0}".format(self.bspTreeDepth())
   def addAxisLines(self):
-    xaxis = QtGui.QGraphicsLineItem(-10,0,10,0)
-    yaxis = QtGui.QGraphicsLineItem(0,-10,0,10)
+    xaxis = QtWidgets.QGraphicsLineItem(-10,0,10,0)
+    yaxis = QtWidgets.QGraphicsLineItem(0,-10,0,10)
     p = QPen(QBrush(QtGui.QColor(31,31,31)), 0, QtCore.Qt.DotLine)
     xaxis.setPen(p)
     yaxis.setPen(p)
@@ -197,14 +197,14 @@ class HexTileGraphicsScene(QtGui.QGraphicsScene):
       #if cells[v]._objects:
       #  # create player circle object
       #  r = CELL_APOTHEM/2.0
-      #  e = QtGui.QGraphicsEllipseItem(-r,-r,r*2,r*2, h)
+      #  e = QtWidgets.QGraphicsEllipseItem(-r,-r,r*2,r*2, h)
       #  e.setBrush(QtGui.QColor.fromHsv(60,255,255))
       #  #e.setPen(QtGui.QPen(QtGui.QColor(0,0,0)))
 
       if False:
         # add Vexor labels
-        textItem = QtGui.QGraphicsSimpleTextItem("% 2d,% 2d,% 2d"%(round(v.x),round(v.y),round(v.z)))
-        textItem = QtGui.QGraphicsSimpleTextItem("% 2d,% 2d"% v.toSkewXY())
+        textItem = QtWidgets.QGraphicsSimpleTextItem("% 2d,% 2d,% 2d"%(round(v.x),round(v.y),round(v.z)))
+        textItem = QtWidgets.QGraphicsSimpleTextItem("% 2d,% 2d"% v.toSkewXY())
         textItem.setBrush(QtGui.QColor.fromHsv(360/6, 255, 255))
         ts = .01
         textItem.setPen(QtGui.QPen(QBrush(QtCore.Qt.black),0))

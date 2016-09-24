@@ -12,7 +12,7 @@ lint: *.py
 
 # Implicit/Pattern rule for compiling .ui files to Python
 %_ui.py : %.ui
-	pyuic4 -o $@ $<
+	pyuic5 -o $@ $<
 
 unittest:
 	$(PYTHON) -c 'import sys; sys.exit(sys.hexversion < 0x02060000)'
