@@ -83,11 +83,12 @@ class Vexor(collections.namedtuple('VexorTuple','x y z v w')):
       dy = abs(y - self.y)
       dz = abs(z - self.z)
       if dx >= dy and dx >= dz:
-        x -= s  # dx is max
+        x -= s  # dx is worst
       elif dy >= dx and dy >= dz:
-        y -= s  # dy is max
+        y -= s  # dy is worst
       else:
-        z -= s
+        assert dz >= dx and dz >= dy
+        z -= s  # dz is worst
     return Vexor(x,y,z,int(self.v),int(self.w))
   def __neg__(self):
     return Vexor(-self.x, -self.y, -self.z, -self.v, -self.w)
@@ -220,29 +221,40 @@ class TestVexor(unittest.TestCase):
         dh = h.manhattanDistance(rh)
         if False:
           print "%s --> %s --> %s {%g}" % \
-          (  h
-          ,  "(% 9.4f,% 9.4f)" % r
-          ,  rh
-          , dh
-          )
-        self.assertTrue(rh.isValid())
+            (  h
+            ,  "(% 9.4f,% 9.4f)" % r
+            ,  rh
+            , dh
+            )
         self.assertEqual(h, h)
+        self.assertEqual(h*0, ZERO)
+        self.assertEqual(h*1, h)
+        self.assertEqual(h*1.0, h)
+        self.assertTrue(rh.isValid())
         self.assertTrue(dh < _EPSILON)
         if s == 0: break
     self.assertEqual( ZERO.manhattanLength(), 0 )
     for n in NEIGHBORS_4D:
+      #print "{}:".format(n)
       self.assertEqual( n.manhattanLength(), 1 )
       self.assertEqual( n.manhattanDistance(ZERO), 1 )
-      for s in range(0,99):
+      for s in range(0,49):
         sth = s / 100.0
-        #print "sth =",sth
-        self.assertEqual( (n*sth).vexorInt(), ZERO )
-        if s < 50:
-          self.assertEqual( (n*sth).vexorInt(round), ZERO )
-        else:
-          self.assertEqual( (n*sth).vexorInt(round), n )
-        #for m in NEIGHBORS_4D:
-        #  self.assertEqual( (n + m*sth).vexorInt(), n )  # this will fail
+        #print "sth = {}".format(sth)
+        #nth = n * sth
+        #print "sth = {}, nth = {}".format(sth, nth)
+        #self.assertEqual( (n*sth).vexorInt(), n )
+        #if s < 50:
+        #  self.assertEqual( (n*sth).vexorInt(round), ZERO )
+        #else:
+        #  self.assertEqual( (n*sth).vexorInt(round), n )
+        for m in NEIGHBORS_4D:
+          mth = m*sth
+          n_mth = n + mth
+          n_mth_int = n_mth.vexorInt(round)
+          #print "m = {}, mth = {}, n_mth = {}, n_mth_int = {}".format(m, mth, n_mth, n_mth_int)
+          self.assertTrue(mth.isValid())
+          self.assertEqual(n_mth_int, n)
     for n in _R2_2D:
       self.assertEqual( n.manhattanLength(), 2 )
       self.assertEqual( n.manhattanDistance(ZERO), 2 )

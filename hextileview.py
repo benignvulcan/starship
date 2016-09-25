@@ -8,8 +8,9 @@ import qtmath, vexor5
 import simulation
 
 def Hexagon(aRect, duodectant=0, antialiasing=False):
-  "Return a hexagonal QPolygon stretched to fit the given rectangle."
-  # Note that QRects are inherently oriented to a +y=down coordinate system
+  "Return a QPolygon of a regular hexagon stretched to fit the given rectangle."
+  # Used for easy tiling of (almost) hexagons using pixmaps on a pixel-based screen.
+  # Note that QRects are inherently oriented to a +y=down coordinate system.
   xc = aRect.center().x()
   yc = aRect.center().y()
   if duodectant % 2:
@@ -62,7 +63,7 @@ def Texture2HSV(tx, pos):
   return (h,s,v)
 
 class Tile(object):
-  "The rendering of a particular cell to a tile on the screen."
+  "The rendering of a particular hexagonal cell to a rectangular tile on the screen."
   # Just does rendering; caching is handled elsewhere.
   def __init__(self, cell):
     super(Tile, self).__init__()
