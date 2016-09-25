@@ -112,8 +112,7 @@ class HexTileView(QtWidgets.QWidget):
     QtWidgets.QWidget.__init__(self, parent)
     self._simulation = theSimulation
     self._tiles = {}   # map from Vexor to Tile
-    self._renderCache = {}  # map from (renderSpec, size, orientation) to QImage
-    self._coordRenderCache = {}  # map from (vexor,size) to QImage
+    self._ClearCache()
     self._zoom = 16
     self._SetTileSize(self._zoom * 8)
     self._currentLayer = 0
@@ -122,11 +121,15 @@ class HexTileView(QtWidgets.QWidget):
     self.setAttribute(QtCore.Qt.WA_OpaquePaintEvent) # disable filling bg from parent widget
     #self.setAutoFillBackground(False)       # disable filling bg from widget palette (default is False)
     self.AddCells(self._simulation._cells)
+  def _ClearCache(self):
+    self._renderCache = {}        # map from (renderSpec, size, orientation) to QImage (of hex cell)
+    self._coordRenderCache = {}   # map from (vexor,size) to QImage (of coordinate number text)
   def AddCells(self, cells):
     for vex in cells.iterkeys():
       t = Tile(cells[vex])
       self._tiles[vex] = t
   def _SetZoom(self, z):
+    self._ClearCache()
     self._zoom = z
     self._SetTileSize(self._zoom * 8)
     self.update()
